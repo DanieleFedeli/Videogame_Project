@@ -48,14 +48,66 @@ int Packet_serialize(char* dest, const PacketHeader* h){
       break;
     }
   }
+<<<<<<< HEAD
+
+  PacketHeader* dest_header=(PacketHeader*)dest;
+=======
   
   PacketHeader* dest_header=(PacketHeader*)dest;
   printf("dest ptr     \t%p\n", dest);
   printf("dest_end ptr \t%p\n", dest_end);
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
   dest_header->size=dest_end-dest;
   return dest_header->size;
 }
 
+<<<<<<< HEAD
+
+
+//reads a packet from a preallocated buffer
+PacketHeader* Packet_deserialize(const char* buffer, int size){
+  const PacketHeader* h=(PacketHeader*) buffer;
+  switch(h->type) {
+    case GetId:
+    case GetTexture:
+    case GetElevation:
+    {
+      IdPacket* id_packet=(IdPacket*) malloc(sizeof(IdPacket));
+      memcpy(id_packet, buffer, sizeof(IdPacket));
+      return (PacketHeader*)id_packet;
+    }
+    case PostTexture:
+    case PostElevation:
+    {
+      ImagePacket* img_packet=(ImagePacket*) malloc(sizeof(ImagePacket));
+      memcpy(img_packet,buffer,sizeof(ImagePacket));
+      // the image is invalid, we need to read it from the buffer
+      size-=sizeof(ImagePacket);
+      buffer+=sizeof(ImagePacket);
+      img_packet->image=Image_deserialize(buffer, size);
+      if (! img_packet->image){
+        free(img_packet);
+        return 0;
+      }
+      return (PacketHeader*)img_packet;
+    }
+    case WorldUpdate:
+    {
+      WorldUpdatePacket* world_packet=(WorldUpdatePacket*) malloc(sizeof(WorldUpdatePacket));
+      memcpy(world_packet, buffer, sizeof(WorldUpdatePacket));
+      // we get the number of clients
+      world_packet->updates=(ClientUpdate*)malloc(world_packet->num_vehicles*sizeof(ClientUpdate));
+      buffer+=sizeof(WorldUpdatePacket);
+      memcpy(world_packet->updates, buffer, world_packet->num_vehicles*sizeof(ClientUpdate));
+      return (PacketHeader*) world_packet;
+    }
+    case VehicleUpdate:
+    { 
+      VehicleUpdatePacket* vehicle_packet=(VehicleUpdatePacket*) malloc(sizeof(VehicleUpdatePacket));
+      memcpy(vehicle_packet, buffer, sizeof(VehicleUpdatePacket));
+      return(PacketHeader*) vehicle_packet;
+    }
+=======
 //reads a packet from a preallocated buffer
 PacketHeader* Packet_deserialize(const char* buffer, int size){
   const PacketHeader* h=(PacketHeader*) buffer;
@@ -98,6 +150,7 @@ PacketHeader* Packet_deserialize(const char* buffer, int size){
   memcpy(vehicle_packet, buffer, sizeof(VehicleUpdatePacket));
   return(PacketHeader*) vehicle_packet;
   }
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
   }
   return 0;
 }

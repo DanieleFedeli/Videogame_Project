@@ -23,7 +23,10 @@ typedef struct {
 // in your client it is not needed, but you will
 // have to copy the x,y,theta fields from the world update packet
 // to the vehicles having the corrsponding id
+<<<<<<< HEAD
+=======
 
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
 void* updater_thread(void* args_){
   UpdaterArgs* args=(UpdaterArgs*)args_;
   while(args->run){

@@ -26,7 +26,11 @@ int main(int argc, char const *argv[]) {
   // can I pass the id_packet oppure the header??
   int id_packet_buffer_size = Packet_serialize(id_packet_buffer, &id_packet->header);
   printf("bytes written in the buffer: %d\n", id_packet_buffer_size);
+<<<<<<< HEAD
+
+=======
   printf("Struct serializated:%s\n", id_packet_buffer);
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
   printf("serialized, now deserialize\n");
   IdPacket* deserialized_packet = (IdPacket*)Packet_deserialize(id_packet_buffer, id_packet_buffer_size);
   printf("deserialized\n");
@@ -97,12 +101,27 @@ int main(int argc, char const *argv[]) {
   w_head.type = WorldUpdate;
 
   world_packet->header = w_head;
+<<<<<<< HEAD
+  world_packet->num_vehicles = 1;
+  world_packet->updates = update_block;
+  
+  printf("world_packet with:\ntype\t%d\nsize\t%d\nnum_v\t%d\n",
+      world_packet->header.type,
+      world_packet->header.size,
+      world_packet->num_vehicles);
+  printf("update_block:\nid\t\t%d\n(x,y,theta)\t(%f,%f,%f)\n", 
+    world_packet->updates->id,
+    world_packet->updates->x,
+    world_packet->updates->y,
+    world_packet->updates->theta);
+=======
   world_packet->num_vehicles = 2;
   world_packet->updates = update_block;
   
   printf("world_packet with:\ntype\t%d\nsize\t%d\n",
       world_packet->header.type,
       world_packet->header.size);
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
 
 
   printf("serialize\n");
@@ -113,9 +132,21 @@ int main(int argc, char const *argv[]) {
   printf("deserialize\n");
   WorldUpdatePacket* deserialized_wu_packet = (WorldUpdatePacket*)Packet_deserialize(world_buffer, world_buffer_size);
 
+<<<<<<< HEAD
+  printf("deserialized packet with:\ntype\t%d\nsize\t%d\nnum_v\t%d\n",
+      deserialized_wu_packet->header.type,
+      deserialized_wu_packet->header.size,
+      deserialized_wu_packet->num_vehicles);
+  printf("update_block:\nid\t\t%d\n(x,y,theta)\t(%f,%f,%f)\n", 
+      deserialized_wu_packet->updates->id,
+      deserialized_wu_packet->updates->x,
+      deserialized_wu_packet->updates->y,
+      deserialized_wu_packet->updates->theta);
+=======
   printf("deserialized packet with:\ntype\t%d\nsize\t%d\n",
       deserialized_wu_packet->header.type,
       deserialized_wu_packet->header.size);
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
 
   Packet_free(&world_packet->header);
   Packet_free(&deserialized_wu_packet->header);

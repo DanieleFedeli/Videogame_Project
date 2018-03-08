@@ -13,7 +13,11 @@ typedef enum PixelType {
 typedef struct Image {
   int rows, cols, channels;
   unsigned char* data;
+<<<<<<< HEAD
+  unsigned char ** row_data;
+=======
   unsigned char** row_data;
+>>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
   PixelType type;
 } Image;
 
