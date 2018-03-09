@@ -1,3 +1,5 @@
+#pragma once
+
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <stdio.h>
@@ -9,7 +11,6 @@
 #include "surface.h"
 
 int window;
-<<<<<<< HEAD
 
 typedef enum ViewType {Inside, Outside, Global} ViewType;
 
@@ -36,10 +37,6 @@ void WorldViewer_destroy(WorldViewer* viewer);
 void WorldViewer_reshapeViewport(WorldViewer* viewer, int width, int height);
 
 
-=======
-WorldViewer viewer;
-
->>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
 void keyPressed(unsigned char key, int x, int y)
 {
   switch(key){
@@ -196,8 +193,9 @@ int Image_toTexture(Image* src) {
 }
 
 void Surface_applyTexture(Surface* s, Image* img) {
+	Image* surface = Image_load("./images/surface.pgm"); //AGGIUNTO PER DISPERAZIONE
   s->texture=img;
-  printf("applying texture %p to surface %p\n", img, s);
+  printf("applying texture %p to surface %p\n", surface, s);
   s->_destructor=Surface_destructor;
   if (s->gl_list>-1)
     glDeleteLists(s->gl_list, 1);
@@ -260,7 +258,6 @@ void Surface_draw(Surface* s) {
 }
 
 
-<<<<<<< HEAD
 void Vehicle_applyTexture(Vehicle* v) {
   printf("applying texture %p to vehicle %p\n", v->texture, v);
   v->_destructor=Vehicle_destructor;
@@ -279,10 +276,6 @@ void Vehicle_draw(Vehicle* v){
     if (v->texture) {
       Vehicle_applyTexture(v);
     }
-=======
-void Vehicle_draw(Vehicle* v){
-  if (v->gl_list<0){
->>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
     v->gl_list = glGenLists(1);
     glNewList(v->gl_list, GL_COMPILE);
     if (v->gl_texture>-1){
@@ -304,23 +297,6 @@ void Vehicle_draw(Vehicle* v){
 }
 
 
-<<<<<<< HEAD
-=======
-void Vehicle_applyTexture(Vehicle* v, Image* img) {
-  v->texture=img;
-  printf("applying texture %p to vehicle %p\n", img, v);
-  v->_destructor=Vehicle_destructor;
-  if (v->gl_list>-1)
-    glDeleteLists(v->gl_list, 1);
-  v->gl_list = -1;
-  if (v->gl_texture>-1)
-    glDeleteTextures(1, (unsigned int*) &v->gl_texture);
-  v->gl_texture = -1;
-  if (img)
-    v->gl_texture=Image_toTexture(img);
-}
-
->>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
 void WorldViewer_init(WorldViewer* viewer,
 		      World* w,
 		      Vehicle* self){
@@ -346,11 +322,7 @@ void WorldViewer_init(WorldViewer* viewer,
   ListItem* item=viewer->world->vehicles.first;
   while(item){
     Vehicle* v=(Vehicle*)item;
-<<<<<<< HEAD
     Vehicle_applyTexture(v);
-=======
-    Vehicle_applyTexture(v, v->texture);
->>>>>>> 95e9c4673c828aa80f9f2ee8b6591352408ed724
     if (v==self){
       viewer->self=self;
     }
