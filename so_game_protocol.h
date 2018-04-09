@@ -10,7 +10,8 @@ typedef enum {
   PostTexture=0x4,		//FATTO server, FATTO client
   PostElevation=0x5,	//FATTO server
   WorldUpdate=0x6,		//FATTO	server
-  VehicleUpdate=0x7		//FATTO server
+  VehicleUpdate=0x7,		//FATTO server
+  NewUser=0x8
 } Type;
 
 typedef struct {
@@ -74,8 +75,6 @@ typedef struct {
   int num_vehicles;
   ClientUpdate* updates;
 } WorldUpdatePacket; //Fatto server
-
-
 
 // converts a well formed packet into a string in dest.
 // returns the written bytes

@@ -13,7 +13,7 @@ typedef struct ListItem {
   float y;						//Read from client
   float theta;					//Read from client
   Image * vehicle_texture;		//Read from ImagePacket
-  struct sockaddr_in addr;		//Struttura sockaddr_in che consente l'aggiornamento via UDP
+  struct sockaddr addr;		//Struttura sockaddr_in che consente l'aggiornamento via UDP
 } ListItem;
 
 typedef struct ListHead {

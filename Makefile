@@ -16,6 +16,7 @@ OBJS = vec3.o\
        linked_list.o\
        surface.o\
        image.o\
+       handler.o\
        vehicle.o\
        world.o\
        world_viewer.o\
@@ -34,6 +35,7 @@ HEADERS=helpers.h\
 	world.h\
 	world_viewer.h\
 	server_protocol.h\
+	handler.h\
 	client_protocol.h\
 
 

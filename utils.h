@@ -33,14 +33,12 @@
 #define PTHREAD_ERROR_HELPER(ret, msg)  GENERIC_ERROR_HELPER((ret != 0), ret, msg)
 
 
-struct acceptTcp{ //USED BY A THREAD IN SERVER
+struct args{ //USED BY A THREAD IN SERVER
 	Image * surface_texture;
 	Image * elevation_texture;
 	Image * vehicle_texture;
 	int tcp_sock;
-};
-
-struct communicateTcp{ //USED BY A THREAD IN SERVER
-	struct acceptTcp arg;
+	int udp_sock;
 	int idx;
 };
+
