@@ -45,7 +45,7 @@ void * tcp_accept(void* arg){
 	while(shouldAccept){
 		int addrlen = sizeof(struct sockaddr_in);
 		struct sockaddr_in client;
-		
+		if(DEBUG) print_all_user();
 		/** ACCETTA CONNESSIONI IN ENTRATA**/
 		if(DEBUG)printf("%sAttesa di una connessione\n",SERVER);
 		new_sock = accept(socket_tcp, (struct sockaddr*) &client, (socklen_t*) &addrlen);
@@ -62,11 +62,6 @@ void * tcp_accept(void* arg){
 		if(DEBUG)printf("%sCreazione thread per la gestione della connessione TCP\n",SERVER);
 		ret = pthread_create(&tcp_handler, NULL, server_tcp_routine, (void*) param);
 		PTHREAD_ERROR_HELPER(ret, "Errore creazione thread");
-		
-		sleep(5);
-		
-		//add_user(new_sock);
-		//notify_user(new_sock, socket_udp);
 		
 		/** NON ASPETTO LA FINE DEL THREAD **/
 		ret = pthread_detach(tcp_handler);
@@ -169,10 +164,8 @@ int main(int argc, char **argv) {
   struct args arg;
 	
 	arg.udp_sock					= socket_udp;
-  arg.tcp_sock 				= socket_tcp;
-  arg.surface_texture 	= surface_texture;
-  arg.elevation_texture= surface_elevation;;
-	
+  arg.tcp_sock 					= socket_tcp;
+	__init__(surface_texture, surface_elevation);
 
 	if(DEBUG)printf("%sThread TCP creato\n",SERVER);
   ret = pthread_create(&tcp_handler, NULL, tcp_accept, (void*) &arg);

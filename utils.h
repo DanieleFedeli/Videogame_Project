@@ -1,3 +1,5 @@
+#pragma once
+
 #include "image.h"
 #include <errno.h>
 
@@ -7,7 +9,7 @@
 #define BACKLOG			5
 #define ACTIVE			8
 #define BUFFERSIZE	1000000
-#define MAX_VEHICLES 8
+
 //USED FOR DEBUG
 #define SERVER	"[SERVER] "
 #define CLIENT  "[CLIENT] "

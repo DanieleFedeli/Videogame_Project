@@ -6,6 +6,8 @@
 #include <string.h>
 #include <pthread.h>
 
+
+#include "handler.h"
 #include "world.h"
 #include "utils.h"
 #include "so_game_protocol.h"
@@ -23,18 +25,6 @@ void __init__(Image* surface_t, Image* elevation_t){
 	elevation = elevation_t;
 	init = 1;
 }
-
-void first_udp_message(int socket_udp, int idx, struct sockaddr_in server){
-		IdPacket* id_packet = (IdPacket*)calloc(1, sizeof(IdPacket));
-		PacketHeader header;
-		char BUFFER[BUFFERSIZE];
-		header.type = GetId;
-		id_packet->header = header;
-		id_packet->id = idx;
-		Packet_serialize(BUFFER, &id_packet->header);
-		sendto(socket_udp, BUFFER, BUFFERSIZE, 0, (struct sockaddr*) &server, sizeof(server));
-}
-
 
 int set_global_communicate(){
 	shouldCommunicate = 1;
@@ -71,7 +61,7 @@ int destroy_resources(){
 }
 
 /** HANDLER PER PACCHETTI RICEVUTI VIA TCP PER SERVER **/
-int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image** texture){
+int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Image** texture, int* ready){
 	int msg_len = 0;
 	PacketHeader* header = (PacketHeader*)PACKET;
 
@@ -119,11 +109,8 @@ int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image
 			toSend->id 		= v->id;
 			toSend->header= head;
 			msg_len = Packet_serialize(SEND, &toSend->header);
-			//Packet_free(&img_packet->header);
 			return msg_len;
 		}
-
-		Packet_free(&img_packet->header);
 
 		if(DEBUG)printf("%sPreparazione pacchetto da inviare\n", TCP);
 
@@ -134,6 +121,10 @@ int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image
 		if(DEBUG)printf("%sSerializzo!\n", TCP);
 		
 		Vehicle_init(v, &w, id, *texture);
+		World_addVehicle(&w, v);
+		
+		*ready = 1;
+		
 		msg_len = Packet_serialize(SEND, &toSend->header);
 		return msg_len;
 	}
@@ -161,25 +152,19 @@ int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image
 	else if(header->type == PostTexture){
 		if(DEBUG)printf("%sPost texture ricevuta\n", TCP);
 		ImagePacket* img_packet = (ImagePacket*)Packet_deserialize(PACKET, header->size);
-		*texture = img_packet->image;
+		*texture = img_packet -> image;
 		return 0;
 	}
 
-	else return 0;
+	else return -1;
 }
 
-int server_udp_packet_handler(char* PACKET, char* SEND, void* arg){
+int server_udp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image** texture){
 PacketHeader* header = (PacketHeader*)PACKET;
 	if(DEBUG)printf("%sSpacchetto...\n",UDP);
 	
 	if(header->type == GetId){
-		IdPacket* id_packet = (IdPacket*)Packet_deserialize(PACKET, header->size);
-		
-		int id = id_packet->id;
-		
-		Vehicle* v = World_getVehicle(&w, id);
-		v->list.addr = *(struct sockaddr*)arg;
-		
+		//
 		return 0;
 	}
 	
@@ -208,7 +193,6 @@ void * server_tcp_routine(void* arg){
 	
 	Vehicle* v = (Vehicle*) calloc(1, sizeof(Vehicle));
 	Image* texture;
-	if(!init) __init__(tcpArg.surface_texture, tcpArg.elevation_texture);
 	int count = 0;
 	/** QUESTO CICLO SERVE PER LEGGERE COSA VUOLE IL CLIENT, PROCESSARE LA RISPOSTA ED INVIARLA **/
 	while(shouldCommunicate && shouldThread && count < 5){
@@ -233,8 +217,11 @@ void * server_tcp_routine(void* arg){
 		
 		/** CHIAMO UN HANDLER PER GENERARE LA RISPOSTA**/
 		
-		msg_len = server_tcp_packet_handler(RECEIVE, SEND, v, tcpArg.idx, &texture);
+		msg_len = server_tcp_packet_handler(RECEIVE, SEND, v, tcpArg.idx, &texture, &ready);
 		if(DEBUG)printf("%sDevo inviare una stringa di %d bytes\n",TCP, msg_len);
+		
+		if(ready) Notify_user(v, tcpArg);
+		
 		/** INVIO RISPOSTA AL CLIENT**/
 		if(msg_len == 0) continue;
 
@@ -254,10 +241,10 @@ void * server_tcp_routine(void* arg){
 }
 
 void * server_udp_routine(void* arg){
-	
+	struct args udpArg = *(struct args*)arg;
 	struct sockaddr_in client_temp = {0};
 	char RECEIVE[BUFFERSIZE], SEND[BUFFERSIZE];
-	int ret, msg_len = 0, addrlen, socket_udp = *(int*)arg;
+	int ret, msg_len = 0, addrlen, socket_udp = udpArg.udp_sock;
 	shouldUpdate = 1;
 	while(shouldCommunicate){
 		sleep(1);
@@ -273,7 +260,7 @@ void * server_udp_routine(void* arg){
 		
 		if(ret == 0) continue; //NESSUNA RISPOSTA
 		if(DEBUG)printf("%sAnalizzo i dati ricevuti\n", UDP);
-		msg_len = server_udp_packet_handler(RECEIVE, SEND, (void *) &client_temp);
+		//msg_len = server_udp_packet_handler(RECEIVE, SEND, (void *) &client_temp);
 		if(DEBUG)printf("%sPacchetto analizzato, msg_len %d\n", UDP, msg_len);
 
 		if(msg_len < 0) if(DEBUG)printf("%sQuesto aggiornamento non è stato processato\n", UDP);
@@ -303,4 +290,28 @@ void quit_server(){
 	if(shouldUpdate) shouldUpdate = 0;
 	if(shouldCommunicate) shouldCommunicate = 0;
 	printf("ShouldUpdate = %d, ShouldCommunicate = %d\n", shouldUpdate, shouldCommunicate);
+}
+
+void Notify_user(Vehicle* v, struct args arg){
+	int socket_udp = arg.udp_sock;
+	int length;
+	char SEND[BUFFERSIZE];
+	
+	IdPacket* id_packet = (IdPacket*)calloc(1, sizeof(IdPacket));
+	PacketHeader header;
+	
+	header.type = GetId;
+	
+	id_packet->id     = v->id;
+	id_packet->header = header;
+	
+	length = Packet_serialize(SEND, &id_packet->header);
+	
+	ListItem* current = w.vehicles.first;
+	
+	for(int i = 0; i < w.vehicles.size; i++){
+	
+		sendto(socket_udp, SEND, length, 0, &current->addr, sizeof(current->addr));
+		current = current->next;
+	}
 }

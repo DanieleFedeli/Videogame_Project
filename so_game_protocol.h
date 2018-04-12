@@ -10,7 +10,6 @@ typedef enum {
   PostElevation=0x5,	
   WorldUpdate=0x6,		
   VehicleUpdate=0x7,	
-  NewUser=0x8
 } Type;
 
 typedef struct {
@@ -27,6 +26,7 @@ typedef struct {
 
 // sent from client to server to ask for an id (id=-1)
 // sent from server to client to assign an id
+// sent from server to client after connection to notify a new user 
 typedef struct {
   PacketHeader header;
   int id;

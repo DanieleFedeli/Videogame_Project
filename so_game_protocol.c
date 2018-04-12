@@ -18,7 +18,6 @@ int Packet_serialize(char* dest, const PacketHeader* h){
     }
     case PostTexture:
     case PostElevation:
-    case NewUser:
     {
       printf("cast\n");
       const ImagePacket* img_packet=(ImagePacket*) h;
@@ -71,7 +70,6 @@ PacketHeader* Packet_deserialize(const char* buffer, int size){
     }
     case PostTexture:
     case PostElevation:
-    case NewUser:
     {
       ImagePacket* img_packet=(ImagePacket*) malloc(sizeof(ImagePacket));
       memcpy(img_packet,buffer,sizeof(ImagePacket));
@@ -125,7 +123,6 @@ void Packet_free(PacketHeader* h) {
   }
   case PostTexture:
   case PostElevation:
-  case NewUser:
   {
     ImagePacket* img_packet=(ImagePacket*) h;
     if (img_packet->image){
