@@ -3,14 +3,13 @@
 
 //ia brief desription required
 typedef enum {
-
-  GetId=0x1,					//FATTO server, FATTO client
-  GetTexture=0x2,     //FATTO server
-  GetElevation=0x3,   //FATTO server, FATTO client
-  PostTexture=0x4,		//FATTO server, FATTO client
-  PostElevation=0x5,	//FATTO server
-  WorldUpdate=0x6,		//FATTO	server
-  VehicleUpdate=0x7,		//FATTO server
+  GetId=0x1,			
+  GetTexture=0x2,   
+  GetElevation=0x3,  
+  PostTexture=0x4,		
+  PostElevation=0x5,	
+  WorldUpdate=0x6,		
+  VehicleUpdate=0x7,	
   NewUser=0x8
 } Type;
 
@@ -20,7 +19,7 @@ typedef struct {
 } PacketHeader;
 
 // sent from client to server to notify its intentions
-typedef struct {		//NON SERVE (PARTE SERVER)
+typedef struct {	
   PacketHeader header;
   float translational_force;
   float rotational_force;
@@ -51,9 +50,6 @@ typedef struct {
 typedef struct {
   PacketHeader header;
   int id;
-  float x;				//Aggiunti da Daniele
-  float y;				//Aggiunti da Daniele
-  float theta;			//Aggiunti da Daniele
   float rotational_force;
   float translational_force;
 } VehicleUpdatePacket; //FATTO server

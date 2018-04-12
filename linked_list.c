@@ -1,4 +1,5 @@
 #include "linked_list.h"
+#include "vehicle.h"
 #include <assert.h>
 
 void List_init(ListHead* head) {
@@ -18,10 +19,11 @@ ListItem* List_find(ListHead* head, ListItem* item) {
   return 0;
 }
 
-ListItem* List_find_id(ListHead* head, int idx){
+ListItem* List_find_id(ListHead* head, int id){
 	ListItem* aux=head->first;
 	while(aux){
-		if (aux -> idx==idx)
+		Vehicle* v = (Vehicle*)aux;
+		if (v -> id == id)
 			return aux;
 		aux=aux->next;
 	}

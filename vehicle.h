@@ -8,7 +8,7 @@ struct World;
 struct Vehicle;
 typedef void (*VehicleDtor)(struct Vehicle* v);
 
-typedef struct Vehicle {
+typedef struct Vehicle{
   ListItem list;
   int id;
   struct World* world;
@@ -35,7 +35,7 @@ typedef struct Vehicle {
   int gl_texture;
   int gl_list;
   VehicleDtor _destructor;
-} Vehicle;
+}Vehicle;
 
 void Vehicle_init(Vehicle* v, struct World* w, int id, Image* texture);
 

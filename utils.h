@@ -7,7 +7,7 @@
 #define BACKLOG			5
 #define ACTIVE			8
 #define BUFFERSIZE	1000000
-
+#define MAX_VEHICLES 8
 //USED FOR DEBUG
 #define SERVER	"[SERVER] "
 #define CLIENT  "[CLIENT] "
@@ -36,7 +36,6 @@
 struct args{ //USED BY A THREAD IN SERVER
 	Image * surface_texture;
 	Image * elevation_texture;
-	Image * vehicle_texture;
 	int tcp_sock;
 	int udp_sock;
 	int idx;

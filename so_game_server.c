@@ -1,25 +1,14 @@
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <wait.h>
-#include <errno.h>
-#include <semaphore.h>
 
 #include "handler.h"
-#include "so_game_protocol.h"
 #include "utils.h"
 #include "image.h"
-#include "surface.h"
-#include "world.h"
-#include "vehicle.h"
-#include "world_viewer.h"
 
 
 int shouldAccept;//VARIABILI GLOBALI USATE NEI THREAD
@@ -57,8 +46,6 @@ void * tcp_accept(void* arg){
 		int addrlen = sizeof(struct sockaddr_in);
 		struct sockaddr_in client;
 		
-		if(DEBUG) print_all_user();
-		
 		/** ACCETTA CONNESSIONI IN ENTRATA**/
 		if(DEBUG)printf("%sAttesa di una connessione\n",SERVER);
 		new_sock = accept(socket_tcp, (struct sockaddr*) &client, (socklen_t*) &addrlen);
@@ -78,8 +65,8 @@ void * tcp_accept(void* arg){
 		
 		sleep(5);
 		
-		add_user(new_sock);
-		notify_user(new_sock, socket_udp);
+		//add_user(new_sock);
+		//notify_user(new_sock, socket_udp);
 		
 		/** NON ASPETTO LA FINE DEL THREAD **/
 		ret = pthread_detach(tcp_handler);
@@ -184,15 +171,14 @@ int main(int argc, char **argv) {
 	arg.udp_sock					= socket_udp;
   arg.tcp_sock 				= socket_tcp;
   arg.surface_texture 	= surface_texture;
-  arg.elevation_texture= surface_elevation;
-  arg.vehicle_texture 	= vehicle_texture;
+  arg.elevation_texture= surface_elevation;;
 	
 
 	if(DEBUG)printf("%sThread TCP creato\n",SERVER);
   ret = pthread_create(&tcp_handler, NULL, tcp_accept, (void*) &arg);
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
   if(DEBUG)printf("%sThread UDP creato\n",SERVER);
-  ret = pthread_create(&udp_handler, NULL, server_udp_routine, (void*) &arg);
+  //ret = pthread_create(&udp_handler, NULL, server_udp_routine, (void*) &arg);
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
 
   /** PARTE DELLA GESTIONE SEGNALI**/
@@ -216,16 +202,14 @@ int main(int argc, char **argv) {
 	/** ASPETTO LA FINE DEI THREAD **/
 	ret = pthread_join(tcp_handler, NULL);
 	PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
-	ret = pthread_join(udp_handler, NULL);
+	//ret = pthread_join(udp_handler, NULL);
 	PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
 
 	/** DEALLOCAZIONE RISOSE **/
 	if(DEBUG)printf("%sDealloco la lista utenti e chiudo file descriptors\n", SERVER);
 	
-	destroy_resources();
-	
-	close(socket_tcp);
-	close(socket_udp);
+	//close(socket_tcp);
+	//close(socket_udp);
 
 	if(DEBUG)printf("%sDealloco immagini\n",SERVER);
 

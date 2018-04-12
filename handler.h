@@ -1,4 +1,5 @@
 #include "linked_list.h"
+#include "image.h"
 
 int server_tcp_packet_handler(char* PACKET, char* SEND, void* arg);
 int server_udp_packet_handler(char* PACKET, char* SEND, void* arg);
@@ -24,7 +25,7 @@ ListHead get_user_on(void);
 ListItem* add_user(int idx);
 
 void print_all_user(void);
-int __init__(void);
+int __init__(Image* t_surface, Image* t_elevation);
 
 void quit_server(void);
 void insert_texture(Image* toPut, int idx);

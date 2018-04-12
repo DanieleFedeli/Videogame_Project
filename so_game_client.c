@@ -36,6 +36,9 @@ Vehicle* vehicle; // The vehicle
 
 
 void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture, int* my_id){
+	//send your texture to the server (so that all can see you)
+  //   -get an elevation map
+  //   -get the texture of the surface
   char* id_buffer 					= (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONI DI ID
   char* image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONE DI IMG
   int ret, length, bytes_sent, bytes_read;
@@ -88,14 +91,15 @@ void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture, i
 	if(DEBUG) printf("%sPreparazione richiesta post texture...\n", CLIENT);
   ImagePacket* image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
   im_head.type = PostTexture;
-
-  image_packet->header = im_head;
+	
+	image_packet->id		= *my_id;
+  image_packet->header= im_head;
   image_packet->image = my_texture;
 	
 	//SERIALIZE PART
   length = Packet_serialize(image_packet_buffer, &image_packet->header);
   printf("Bytes scritti nel buffer: %d\n", length);
-	Packet_free(&image_packet->header);
+	//Packet_free(&image_packet->header);
 		
 	//INVIO BUFFER
 	ret = send(socket_tcp, image_packet_buffer, length, 0);
@@ -112,7 +116,6 @@ void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture, i
   im_head.type = GetElevation;
 
   image_packet -> header = im_head;
-  image_packet -> id = *my_id;
   image_packet -> image = NULL;
   
   //SERIALIZE PART
@@ -143,7 +146,7 @@ void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture, i
 	im_head.type = GetTexture;
 	
 	image_packet -> header = im_head;
-	image_packet -> id = *my_id;
+	image_packet -> id = 0;
 	image_packet -> image = NULL;
 	
 	//SERIALIZE PART
@@ -161,7 +164,6 @@ void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture, i
 	//DESERIALIZE PART
 	image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
 	*map_texture = image_packet -> image;
-	if(DEBUG) printf("%sPuntatore della surface: %p\n",CLIENT, *map_texture);
 }
 
 
@@ -192,7 +194,6 @@ int main(int argc, char **argv) {
   int my_id, ret;
   char* server_address;
 	//GENERA ERRORE PASSARE QUESTA ALLA FUNZIOEN GETTER
-  Image* my_texture_for_server = Image_load(VEHICLE_FILENAME);	//COSÌ PASSEREMO *_FOR_SERVER CHE È UNA COPIA.
   
   Image* map_elevation;
   Image* map_texture;
@@ -215,22 +216,17 @@ int main(int argc, char **argv) {
   if(DEBUG) printf("%sConnect eseguita\n", CLIENT);
   //CONNESSIONE EFFETTUATA
 
-  getter_TCP(my_texture_for_server, &map_elevation, &map_texture, &my_id);
+  getter_TCP(my_texture, &map_elevation, &map_texture, &my_id);
   
   //UTENTE EFFETTIVAMENTE CONNESSO
   
 	
   // COSTRUZIONE MONDO
-  if(DEBUG) printf("%sWorld init\n", CLIENT);
 	if(DEBUG) printf("%smap_elevation: %p\n%smap_texture: %p\n%smy_texture_from_server: %p\n", CLIENT, map_elevation, CLIENT, map_texture,CLIENT, my_texture);
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
-  if(DEBUG) printf("%sVehicle init\n", CLIENT);
   vehicle= (Vehicle*) malloc(sizeof(Vehicle));
-  if(DEBUG) printf("%sPresunto errore\n", CLIENT);
   Vehicle_init(vehicle, &world, my_id, my_texture);
-  if(DEBUG) printf("%sAdd vehicle to world\n", CLIENT);
   World_addVehicle(&world, vehicle);
-	if(DEBUG) printf("%sParte set up variable\n", CLIENT);
 	 
   // spawn a thread that will listen the update messages from
   // the server, and sends back the controls
@@ -239,7 +235,7 @@ int main(int argc, char **argv) {
   // when the server notifies a new player has joined the game
   // request the texture and add the player to the pool
   /*FILLME*/
-  
+  /*
   int socket_udp;
 
   socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
@@ -252,7 +248,7 @@ int main(int argc, char **argv) {
   struct args* arg = (struct args*) calloc(1, sizeof(struct args));
   arg -> idx = my_id;
 	arg -> surface_texture = map_texture;
-	arg -> vehicle_texture = my_texture;
+	//arg -> vehicle_texture = my_texture;
 	arg -> elevation_texture = map_elevation;
 	arg -> tcp_sock = socket_tcp;
 	arg -> udp_sock = socket_udp;
@@ -265,6 +261,7 @@ int main(int argc, char **argv) {
   
   ret = pthread_detach(udp_thread);
   
+  */
 	if(DEBUG) printf("%sWorld run\n", CLIENT);
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
 	

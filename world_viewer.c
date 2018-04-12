@@ -193,9 +193,8 @@ int Image_toTexture(Image* src) {
 }
 
 void Surface_applyTexture(Surface* s, Image* img) {
-	Image* surface = Image_load("./images/surface.pgm"); //AGGIUNTO PER DISPERAZIONE
   s->texture=img;
-  printf("applying texture %p to surface %p\n", surface, s);
+  printf("applying texture %p to surface %p\n", img, s);
   s->_destructor=Surface_destructor;
   if (s->gl_list>-1)
     glDeleteLists(s->gl_list, 1);

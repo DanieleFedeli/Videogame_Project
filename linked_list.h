@@ -1,20 +1,11 @@
 #pragma once
-
 #include <netinet/in.h>
-#include "image.h"
 
 typedef struct ListItem {
   struct ListItem* prev;
   struct ListItem* next;
-  int 	idx;					//L'idx è anche il fd della socket tcp
-  float rotational_force;		//Read from vehicleUpdatePacket
-  float translational_force;	//Read from VehicleUpdatePacket
-  float x;						//Read from client
-  float y;						//Read from client
-  float theta;					//Read from client
-  Image * vehicle_texture;		//Read from ImagePacket
-  struct sockaddr addr;		//Struttura sockaddr_in che consente l'aggiornamento via UDP
-} ListItem;
+  struct sockaddr addr;				//Struttura sockaddr_in che consente l'aggiornamento via UDP
+}ListItem;
 
 typedef struct ListHead {
   ListItem* first;
