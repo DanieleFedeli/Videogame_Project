@@ -3,8 +3,8 @@
 #include "utils.h"
 #include "vehicle.h"
 
-int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image** texture, int* ready);
-int server_udp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image** texture);
+int server_tcp_packet_handler(char* PACKET, char* SEND,Vehicle* v, int id, Image** texture,const struct args* arg);
+int server_udp_packet_handler(char* PACKET, const struct args* arg);
 
 void * server_tcp_routine(void* arg);
 void * server_udp_routine(void* arg);
@@ -23,6 +23,3 @@ void __init__(Image* t_surface, Image* t_elevation);
 
 void quit_server(void);
 void insert_texture(Image* toPut, int idx);
-
-int destroy_resources(void);
-void Notify_user(Vehicle* v, struct args arg);

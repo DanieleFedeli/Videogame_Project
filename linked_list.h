@@ -4,7 +4,7 @@
 typedef struct ListItem {
   struct ListItem* prev;
   struct ListItem* next;
-  struct sockaddr addr;				//Struttura sockaddr_in che consente l'aggiornamento via UDP
+  int socket_udp;
 }ListItem;
 
 typedef struct ListHead {

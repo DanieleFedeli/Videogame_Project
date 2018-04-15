@@ -12,6 +12,7 @@ typedef struct Vehicle{
   ListItem list;
   int id;
   struct World* world;
+  struct sockaddr addr;
   Image* texture;
 
   // these are the forces that will be applied after the update

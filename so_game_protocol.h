@@ -22,6 +22,7 @@ typedef struct {
   PacketHeader header;
   float translational_force;
   float rotational_force;
+
 } VehicleForces;
 
 // sent from client to server to ask for an id (id=-1)
@@ -52,6 +53,9 @@ typedef struct {
   int id;
   float rotational_force;
   float translational_force;
+  float x;
+  float y;
+  float theta;
 } VehicleUpdatePacket; //FATTO server
 
 

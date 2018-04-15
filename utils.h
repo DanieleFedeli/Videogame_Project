@@ -1,8 +1,9 @@
 #pragma once
 
-#include "image.h"
 #include <errno.h>
+#include <semaphore.h>
 
+#include "image.h"
 
 #define SERVER_IP 	"127.0.0.1"
 #define SERVER_PORT 8080
@@ -19,7 +20,7 @@
 #define VEHICLE_FILENAME   "./images/arrow-right.ppm"
 #define SURFACE_FILENAME   "./images/maze.ppm"
 
-#define DEBUG	1
+#define DEBUG	0
 
 
 
@@ -38,6 +39,8 @@
 struct args{ //USED BY A THREAD IN SERVER
 	Image * surface_texture;
 	Image * elevation_texture;
+	sem_t* create_sem;
+	sem_t* udptcp_sem;
 	int tcp_sock;
 	int udp_sock;
 	int idx;
