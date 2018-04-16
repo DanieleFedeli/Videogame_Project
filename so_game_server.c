@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
-#include <fcntl.h>
 #include <wait.h>
 #include <semaphore.h>
 
@@ -18,6 +17,7 @@ int shouldAccept;//VARIABILI GLOBALI USATE NEI THREAD
 /** SIGNAL HANDLER **/
 
 void action(int sig, siginfo_t *siginfo, void* context){
+	
 	switch(sig){
 		case SIGQUIT:
 		case SIGTERM:
@@ -35,7 +35,7 @@ void action(int sig, siginfo_t *siginfo, void* context){
 	}
 }
 
-
+sem_t* UDPEXEC;
 
 /** ROUTINE CHE ASCOLTA LE CONNESSIONI IN ENTRATA E LANCIA UN TCP_ROUTINE PER CONNESSIONE **/
 void * thread_generatore(void* arg){
@@ -43,31 +43,23 @@ void * thread_generatore(void* arg){
 	int socket_tcp = param -> tcp_sock;
 	pthread_t tcp_handler, udp_handler;
 	int new_sock, ret;
-	sem_t* create_sem;
-	sem_t* udptcp_sem;
-	/** SE LA VARIABILE GLOBALE SHOULDACCEPT = 1, ACCETTA EVENTUALI CONNESSIONI IN ENTRATA **/
 	
+	/** SE LA VARIABILE GLOBALE SHOULDACCEPT = 1, ACCETTA EVENTUALI CONNESSIONI IN ENTRATA **/	
 	while(shouldAccept){
 		int addrlen = sizeof(struct sockaddr_in);
 		struct sockaddr_in client;
-		if(DEBUG) print_all_user();
+		
+		//if(DEBUG) print_all_user(); 
+		
 		/** ACCETTA CONNESSIONI IN ENTRATA**/
+		
 		new_sock = accept(socket_tcp, (struct sockaddr*) &client, (socklen_t*) &addrlen);
-		if(new_sock == -1){
-			sleep(1); 	//USATA PER NON USARE IL 100% DELLA CPU
+		if(new_sock == -1){ 
 			continue;
 		}
+		if(DEBUG)printf("%sConnessione accettata...\n",SERVER);
 		param->idx = new_sock;
-		create_sem = (sem_t*) calloc(1, sizeof(sem_t));
-		udptcp_sem = (sem_t*) calloc(1, sizeof(sem_t));
 		
-		ret = sem_init(create_sem, 0, 1);
-		ERROR_HELPER(ret, "Errore nella creazione del semaforo");
-		ret = sem_init(udptcp_sem, 0, 0);
-		ERROR_HELPER(ret, "Errore nella creazione del semaforo");
-		
-		param->create_sem = create_sem;
-		param->udptcp_sem = udptcp_sem;
 		/** LANCIO IL THREAD CON LA FUNZIONE TCP_RUOTINE **/
 		ret = pthread_create(&tcp_handler, NULL, server_tcp_routine, (void*) param);
 		PTHREAD_ERROR_HELPER(ret, "Errore creazione thread");
@@ -76,14 +68,16 @@ void * thread_generatore(void* arg){
 		ret = pthread_detach(tcp_handler);
 		PTHREAD_ERROR_HELPER(ret, "Errore detach thread");
 		
-		sem_wait(udptcp_sem);
+		/** ASPETTO L'AGGIUNTA DEL VEICOLO E LANCIO IL THREAD CON LA FUNZIONE UDP_ROUTINE **/
+		
+		sem_wait(UDPEXEC);
 		ret = pthread_create(&udp_handler, NULL, server_udp_routine, (void*) param);
 		PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
 		
+		/** NON ASPETTO LA FINE DEL THREAD **/
 		ret = pthread_detach(udp_handler);
 		PTHREAD_ERROR_HELPER(ret, "Errore detach thread");
 	}
-	
 	if(DEBUG)printf("%sChiusura server\n",SERVER);
 	pthread_exit(NULL);
 }
@@ -101,7 +95,7 @@ int main(int argc, char **argv) {
   Image* vehicle_texture = Image_load(vehicle_texture_filename);
 
 	/** DICHIARAZIONE VARIABILI DI RETE **/
-	int ret, socket_tcp, socket_udp;
+	int ret, socket_tcp;
 	struct sockaddr_in my_addr = {0};
 
 	/** GENERO IL SOCKET PER LA COMUNICAZIONE TCP **/
@@ -118,11 +112,9 @@ int main(int argc, char **argv) {
   ret = setsockopt(socket_tcp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
 	ERROR_HELPER(ret, "Errore socketOpt");
 
-
 	/** SETTO IL SOCKET NON BLOCCANTE **/
 	ret = ioctl(socket_tcp, FIONBIO, &reuseaddr_opt, sizeof(reuseaddr_opt));
 	ERROR_HELPER(ret, "Errore ioctl");
-	
 	
 	/** EFFETTO IL BINDING DELL'INDIRIZZO AD UN INTERFACCIA **/
   ret = bind(socket_tcp, (struct sockaddr*) &my_addr, sizeof(my_addr));
@@ -132,18 +124,6 @@ int main(int argc, char **argv) {
 	ret = listen(socket_tcp, BACKLOG);
   ERROR_HELPER(ret, "Errore nella listen");
 
-  /** CREO SOCKET PER LA UDP +*/
-  socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
-  ERROR_HELPER(ret, "Errore nella socket");
-	
-	/** SETTO IL SOCKET RIUSABILE, IN SEGUITO A CRASH POTRÀ ESSERE RIUSATO **/
-  ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
-	ERROR_HELPER(ret, "Errore socketOpt");
-	
-  /** EFFETTO IL BINDING DELL'INDIRIZZO AD UN INTERFACCIA **/
-  ret = bind(socket_udp, (struct sockaddr*) &my_addr, sizeof(my_addr));
-  ERROR_HELPER(ret, "Errore bind");
-
   /** SETTO VARIABILI GLOBALI **/
   shouldAccept			= 1;
 
@@ -151,10 +131,19 @@ int main(int argc, char **argv) {
   pthread_t generatore;
 
   struct args arg;
-	
-	arg.udp_sock					= socket_udp;
   arg.tcp_sock 					= socket_tcp;
-	__init__(surface_texture, surface_elevation);
+  sem_t* create_sem = (sem_t*) calloc(1, sizeof(sem_t));
+  sem_t* udptcp_sem = (sem_t*) calloc(1, sizeof(sem_t));
+  UDPEXEC = (sem_t*) calloc(1, sizeof(sem_t));
+  
+  ret = sem_init(create_sem, 0, 1);
+  ERROR_HELPER(ret, "Inizializzazione semaforo");
+  ret = sem_init(udptcp_sem, 0, 1);
+  ERROR_HELPER(ret, "Inizializzazione semaforo");
+  ret = sem_init(UDPEXEC, 0, 0);
+  ERROR_HELPER(ret, "Inizializzazione semaforo");
+  
+	__init__(surface_texture, surface_elevation, create_sem, udptcp_sem, UDPEXEC);
 
   ret = pthread_create(&generatore, NULL, thread_generatore, (void*) &arg);
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
@@ -171,6 +160,8 @@ int main(int argc, char **argv) {
 	ret = sigaction(SIGQUIT, &act, NULL);
 	ERROR_HELPER(ret, "Errore nella sigaction");
 	ret = sigaction(SIGTERM, &act, NULL);
+	ERROR_HELPER(ret, "Errore nella sigaction");
+	//ret = sigaction(SIGSEGV, &act, NULL);
 	ERROR_HELPER(ret, "Errore nella sigaction");
 	ret = sigaction(SIGALRM, &act, NULL);
 	ERROR_HELPER(ret, "Errore nella sigaction");

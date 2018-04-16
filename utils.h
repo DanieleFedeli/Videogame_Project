@@ -20,9 +20,7 @@
 #define VEHICLE_FILENAME   "./images/arrow-right.ppm"
 #define SURFACE_FILENAME   "./images/maze.ppm"
 
-#define DEBUG	0
-
-
+#define DEBUG	1
 
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \
         if (cond) {                                                 \
@@ -37,10 +35,6 @@
 
 
 struct args{ //USED BY A THREAD IN SERVER
-	Image * surface_texture;
-	Image * elevation_texture;
-	sem_t* create_sem;
-	sem_t* udptcp_sem;
 	int tcp_sock;
 	int udp_sock;
 	int idx;
