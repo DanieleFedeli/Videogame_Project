@@ -28,38 +28,41 @@ void* getter(void* arg){
 	char* RECEIVE = (char*)calloc(BUFFERSIZE, sizeof(char));
 	char* SEND = (char*)calloc(BUFFERSIZE, sizeof(char));
 	Vehicle* toAdd = (Vehicle*) calloc(1, sizeof(Vehicle));
-	PacketHeader h;
-	ImagePacket* image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
+	ImagePacket* image_packet;
 	
-	h.type = GetTexture;
-	image_packet->header = h;
-	image_packet->id = param.idx;
 	
-	msg_len = Packet_serialize(SEND, &image_packet->header);
-	//Packet_free(&image_packet->header);
+	while(1){
+		image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
+		PacketHeader h;
+		h.type = GetTexture;
+		image_packet->header = h;
+		image_packet->id = param.idx;
+		image_packet->image = calloc(1, sizeof(Image));
+		msg_len = Packet_serialize(SEND, &image_packet->header);
 	
-	if(DEBUG)printf("%sPrima della send\n", CLIENT);
-	ret = send(param.tcp_sock, SEND, msg_len, 0);
-	ERROR_HELPER(ret, "Errore nella send");
-	if(DEBUG)printf("%sPrima della rcv\n", CLIENT);
+		if(DEBUG)printf("%sPrima della send\n", CLIENT);
+		ret = send(param.tcp_sock, SEND, msg_len, 0);
+		ERROR_HELPER(ret, "Errore nella send");
+		if(DEBUG)printf("%sPrima della rcv\n", CLIENT);
 		
-	ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, 0);
-	if(DEBUG)printf("%sDopo la recv\n", CLIENT);
-	ERROR_HELPER(ret, "Errore nella receive");
+		ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, 0);
+		if(DEBUG)printf("%sDopo la recv\n", CLIENT);
+		ERROR_HELPER(ret, "Errore nella receive");
 	
-	if(DEBUG)printf("%sRicevuti %d bytes..\n", CLIENT, ret);
+		if(DEBUG)printf("%sRicevuti %d bytes..\n", CLIENT, ret);
 	
-	h = *(PacketHeader*)RECEIVE;
-	image_packet = (ImagePacket*)Packet_deserialize(RECEIVE, h.size);
+		h = *(PacketHeader*)RECEIVE;
+		image_packet = (ImagePacket*)Packet_deserialize(RECEIVE, ret);
+		if(DEBUG)printf("%sRECEIVE: %s %p ret: %d h->size: %d\n", CLIENT, RECEIVE, &RECEIVE, ret, h.size);
 	
+		if(h.size > 150000 && ret > 150000) break;
+	}
 	sem_wait(world_sem);
 	if(DEBUG)printf("%sAggiungo user con id:%d\n", CLIENT, param.idx);
 	Vehicle_init(toAdd, &world, param.idx, image_packet->image);
 	
 	World_addVehicle(&world, toAdd);
 	sem_post(world_sem);
-	//free(RECEIVE);
-	//free(SEND);
 	pthread_exit(NULL);
 }
 
@@ -68,7 +71,7 @@ int packet_handler_udp(char* PACKET, char* SEND){
 	struct args* param;
 	int ret;
 	if(h->type == WorldUpdate){
-		if(DEBUG)printf("%sWorldUpdate..\n",CLIENT);
+		//if(DEBUG)printf("%sWorldUpdate..\n",CLIENT);
 		WorldUpdatePacket* wup = (WorldUpdatePacket*) Packet_deserialize(PACKET, h->size);
 		for(int i = 0; i < wup->num_vehicles; i++){
 			sem_wait(world_sem);
@@ -91,17 +94,40 @@ int packet_handler_udp(char* PACKET, char* SEND){
 			}
 			else{
 				sem_wait(world_sem);
-				if(DEBUG)printf("%sAggiorno veicolo %d..\n",CLIENT, wup->updates[i].id);
 				v->theta 	= wup->updates[i].theta;
 				v->x 			= wup->updates[i].x;
 				v->y 			= wup->updates[i].y;
 				sem_post(world_sem);
 			}
-			
-			if(DEBUG)printf("%sSEMAFORO SGANCIATO IN HANDLER..\n",CLIENT);
 		}
 		
+		if(world.vehicles.size == wup->num_vehicles) return 0;
 		
+		if(DEBUG)printf("%sAlla ricerca del veicolo inattivo...\n",CLIENT);
+		sem_wait(world_sem);
+		Vehicle* current = (Vehicle*) world.vehicles.first;
+		for(int i = 0; i < world.vehicles.size; i++){
+			int in = 0, forward = 0;
+			for(int j = 0; j < wup->num_vehicles && !in; j++){
+				if(current->id == wup->updates[j].id){
+					if(DEBUG) printf("%sVEICOLO %d ATTIVO\n", CLIENT, current->id);
+					in = 1;
+				}
+			}
+			
+			if(!in){
+				if(DEBUG)printf("%sEliminio veicolo %d\n",CLIENT, current->id);
+				Vehicle* toDelete = current;
+				World_detachVehicle(&world, toDelete);
+				current = (Vehicle*) current->list.next;
+				forward = 1;
+				free(toDelete);
+			}
+			
+			if(!forward) current = (Vehicle*) current->list.next;	
+		}
+		
+		sem_post(world_sem);
 		return 0;
 	}
 	
@@ -121,6 +147,7 @@ void* client_udp_routine(void* arg){
 	
 	socket_udp = param -> udp_sock;
 	if(DEBUG)printf("%sRoutine udp avviata..\n",CLIENT);
+	
 	while(shouldUpdate){
 		SEND 		= (char*) calloc(BUFFERSIZE, sizeof(char*));
 		RECEIVE = (char*) calloc(BUFFERSIZE, sizeof(char*));
@@ -140,10 +167,8 @@ void* client_udp_routine(void* arg){
 		
 		
 		length = Packet_serialize(SEND, &vup->header);
-		if(DEBUG)printf("%sPreparo pacchetto da inviare..\n",CLIENT);
 		ret = sendto(socket_udp, SEND, length, 0,(struct sockaddr*) &addr, length);
 		ERROR_HELPER(ret, "Errore nella sendto");
-		if(DEBUG)printf("%sInviati %d bytes da id: %d..\n",CLIENT, ret, vehicle->id);
 		length = sizeof(struct sockaddr);
 		ret = recvfrom(socket_udp, RECEIVE, BUFFERSIZE, 0,(struct sockaddr*) &addr, (socklen_t*) &length);
 		if(ret == -1){
@@ -313,7 +338,7 @@ int main(int argc, char **argv) {
 	
   //CONNESSIONE EFFETTUATA
 	struct timeval tv;
-	tv.tv_sec = 5;
+	tv.tv_sec = 15;
 	tv.tv_usec= 0;
 	ret = setsockopt(socket_tcp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
   getter_TCP(my_texture, &map_elevation, &map_texture, &my_id);
@@ -327,8 +352,8 @@ int main(int argc, char **argv) {
   pthread_t udp_thread;
   int socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
   
-  ret = setsockopt(socket_udp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-	ERROR_HELPER(ret, "Errore socketOpt");
+  //ret = setsockopt(socket_udp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	//ERROR_HELPER(ret, "Errore socketOpt");
 	
   struct args* arg = (struct args*) calloc(1, sizeof(struct args));
   arg -> idx = my_id;
@@ -347,7 +372,6 @@ int main(int argc, char **argv) {
   
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazioni del thread");
   ret = pthread_detach(udp_thread);
-  
   
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);
 	World_destroy(&world);

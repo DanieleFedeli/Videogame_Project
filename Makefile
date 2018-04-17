@@ -22,7 +22,8 @@ OBJS = vec3.o\
        world_viewer.o\
        so_game_protocol.o\
        so_game_server.o\
-       so_game_client.o
+       so_game_client.o\
+       logger.o\
 
 HEADERS=helpers.h\
 	image.h\
@@ -34,9 +35,8 @@ HEADERS=helpers.h\
 	vehicle.h\
 	world.h\
 	world_viewer.h\
-	server_protocol.h\
 	handler.h\
-	client_protocol.h\
+	logger.h\
 
 
 %.o:	%.c $(HEADERS)

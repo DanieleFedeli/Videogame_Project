@@ -1,7 +1,9 @@
 #include <sys/ioctl.h>
+#include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <wait.h>
@@ -10,9 +12,12 @@
 #include "handler.h"
 #include "utils.h"
 #include "image.h"
+#include "logger.h"
 
 
 int shouldAccept;//VARIABILI GLOBALI USATE NEI THREAD
+pid_t logger_pid;
+time_t curr_time;
 
 /** SIGNAL HANDLER **/
 
@@ -25,6 +30,10 @@ void action(int sig, siginfo_t *siginfo, void* context){
 		{
 			shouldAccept = 0;
 			quit_server();
+		}
+		case SIGSEGV:
+		{
+			ERROR_HELPER_LOGGER(-1, "SEGMENTATION FAULT!!!\n");
 		}
 		case SIGALRM:
 		{
@@ -46,18 +55,22 @@ void * thread_generatore(void* arg){
 	
 	/** SE LA VARIABILE GLOBALE SHOULDACCEPT = 1, ACCETTA EVENTUALI CONNESSIONI IN ENTRATA **/	
 	while(shouldAccept){
+	
 		int addrlen = sizeof(struct sockaddr_in);
 		struct sockaddr_in client;
-		
-		//if(DEBUG) print_all_user(); 
 		
 		/** ACCETTA CONNESSIONI IN ENTRATA**/
 		
 		new_sock = accept(socket_tcp, (struct sockaddr*) &client, (socklen_t*) &addrlen);
 		if(new_sock == -1){ 
+			sleep(1);
 			continue;
+			
 		}
-		if(DEBUG)printf("%sConnessione accettata...\n",SERVER);
+		if(DEBUG) print_all_user(); 
+		
+		time(&curr_time);
+		fprintf(stderr, "%s%sConnessione accettata. ID: %d\n", ctime(&curr_time), SERVER, new_sock);
 		param->idx = new_sock;
 		
 		/** LANCIO IL THREAD CON LA FUNZIONE TCP_RUOTINE **/
@@ -77,8 +90,12 @@ void * thread_generatore(void* arg){
 		/** NON ASPETTO LA FINE DEL THREAD **/
 		ret = pthread_detach(udp_handler);
 		PTHREAD_ERROR_HELPER(ret, "Errore detach thread");
+		
+		sleep(1);
+		
 	}
-	if(DEBUG)printf("%sChiusura server\n",SERVER);
+	time(&curr_time);
+	fprintf(stderr, "%s%sChiusura server!\n", ctime(&curr_time), SERVER);
 	pthread_exit(NULL);
 }
 
@@ -127,54 +144,86 @@ int main(int argc, char **argv) {
   /** SETTO VARIABILI GLOBALI **/
   shouldAccept			= 1;
 
-	/** PARTE PARALLELA **/
-  pthread_t generatore;
 
-  struct args arg;
-  arg.tcp_sock 					= socket_tcp;
-  sem_t* create_sem = (sem_t*) calloc(1, sizeof(sem_t));
-  sem_t* udptcp_sem = (sem_t*) calloc(1, sizeof(sem_t));
-  UDPEXEC = (sem_t*) calloc(1, sizeof(sem_t));
-  
-  ret = sem_init(create_sem, 0, 1);
-  ERROR_HELPER(ret, "Inizializzazione semaforo");
-  ret = sem_init(udptcp_sem, 0, 1);
-  ERROR_HELPER(ret, "Inizializzazione semaforo");
-  ret = sem_init(UDPEXEC, 0, 0);
-  ERROR_HELPER(ret, "Inizializzazione semaforo");
-  
-	__init__(surface_texture, surface_elevation, create_sem, udptcp_sem, UDPEXEC);
-
-  ret = pthread_create(&generatore, NULL, thread_generatore, (void*) &arg);
-  PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
-  
-  /** PARTE DELLA GESTIONE SEGNALI**/
-  struct sigaction act;
-  memset(&act, '\0', sizeof(act));
-
-  act.sa_sigaction = &action;
-  act.sa_flags		 = SA_SIGINFO;
-
-	ret = sigaction(SIGINT, &act, NULL);
-	ERROR_HELPER(ret, "Errore nella sigaction");
-	ret = sigaction(SIGQUIT, &act, NULL);
-	ERROR_HELPER(ret, "Errore nella sigaction");
-	ret = sigaction(SIGTERM, &act, NULL);
-	ERROR_HELPER(ret, "Errore nella sigaction");
-	//ret = sigaction(SIGSEGV, &act, NULL);
-	ERROR_HELPER(ret, "Errore nella sigaction");
-	ret = sigaction(SIGALRM, &act, NULL);
-	ERROR_HELPER(ret, "Errore nella sigaction");
-	alarm(2);
+	/** CREAZIONE DEL LOG **/
+	char* logfile_name = "./Logger/server-logger.txt";
+	int logfile_desc = open(logfile_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	ERROR_HELPER(logfile_name, "Errore nella creazione del logger");
 	
-	/** ASPETTO LA FINE DEI THREAD **/
-	ret = pthread_join(generatore, NULL);
-	PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
+	int logger_pipe[2];
+	ret = pipe(logger_pipe);
+	ERROR_HELPER(ret, "Impossibile creare pipe");
 	
-	/** DEALLOCAZIONE RISOSE **/	
-	Image_free(surface_elevation);
-	Image_free(surface_texture);
-	Image_free(vehicle_texture);
+	logger_pid = fork();
+	if(logger_pid == -1)	ERROR_HELPER(-1, "Impossibile creare figlio logger");
+	else if(logger_pid == 0){
+		ret = close(socket_tcp);
+		ERROR_HELPER(ret, "Impossibile chiudere il listening socket");
+		
+		startLogger(logfile_desc, logger_pipe);
+	}
+	else{
+		/** PARTE PARALLELA **/
+		close(logfile_desc);
+		close(logger_pipe[0]);
+		
+		dup2(logger_pipe[1], STDERR_FILENO);
+		
+		//Current time
+		time(&curr_time);
+		fprintf(stderr, "%s%sServer startato\n", ctime(&curr_time), SERVER);
+		
+		pthread_t generatore;
+		struct args arg;
+		arg.tcp_sock 					= socket_tcp;
+		sem_t* create_sem = (sem_t*) calloc(1, sizeof(sem_t));
+		sem_t* udptcp_sem = (sem_t*) calloc(1, sizeof(sem_t));
+		UDPEXEC = (sem_t*) calloc(1, sizeof(sem_t));
+  
+		ret = sem_init(create_sem, 0, 1);
+		ERROR_HELPER_LOGGER(ret, "Inizializzazione semaforo");
+		ret = sem_init(udptcp_sem, 0, 1);
+		ERROR_HELPER_LOGGER(ret, "Inizializzazione semaforo");
+		ret = sem_init(UDPEXEC, 0, 0);
+		ERROR_HELPER_LOGGER(ret, "Inizializzazione semaforo");
+  
+		__init__(surface_texture, surface_elevation, create_sem, udptcp_sem, UDPEXEC);
+		
+		fprintf(stderr, "%s%sStart thread listener\n", ctime(&curr_time), SERVER);
+		ret = pthread_create(&generatore, NULL, thread_generatore, (void*) &arg);
+		PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
+  
+		/** PARTE DELLA GESTIONE SEGNALI**/
+		struct sigaction act;
+		memset(&act, '\0', sizeof(act));
 
-	exit(EXIT_SUCCESS);
+		act.sa_sigaction = &action;
+		act.sa_flags		 = SA_SIGINFO;
+
+		ret = sigaction(SIGINT, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGQUIT, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGTERM, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGSEGV, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGALRM, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		alarm(2);
+	
+		/** ASPETTO LA FINE DEI THREAD **/
+		ret = pthread_join(generatore, NULL);
+		PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
+		
+		ret = close(logger_pipe[1]);
+		ERROR_HELPER_LOGGER(ret, "Errore nella chiusura della pipe");
+		
+		/** DEALLOCAZIONE RISOSE **/	
+		Image_free(surface_elevation);
+		Image_free(surface_texture);
+		Image_free(vehicle_texture);
+
+		exit(EXIT_SUCCESS);
+	}
 }

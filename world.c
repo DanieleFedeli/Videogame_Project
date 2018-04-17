@@ -75,7 +75,7 @@ Vehicle* World_getVehicle(World* w, int vehicle_id){
 }
 
 Vehicle* World_addVehicle(World* w, Vehicle* v){
-  //assert(!World_getVehicle(w,v->id));
+  assert(!World_getVehicle(w,v->id));
   return (Vehicle*)List_insert(&w->vehicles, w->vehicles.last, (ListItem*)v);
 }
 

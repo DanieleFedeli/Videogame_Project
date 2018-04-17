@@ -22,5 +22,5 @@ void print_all_user(void);
 void __init__(Image* t_surface, Image* t_elevation, sem_t* world_sem_t, sem_t* thread_sem_t, sem_t* UDPEXEC_t);
 
 void quit_server(void);
-void shutDown_thead(void);
+void shutDown_thead(int id);
 void insert_texture(Image* toPut, int idx);
