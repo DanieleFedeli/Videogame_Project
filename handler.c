@@ -20,6 +20,11 @@ Image* elevation;
 sem_t* world_sem, *thread_sem, *UDPEXEC, *cancelThread;
 World w;
 
+int set_global_update(){
+	shouldUpdate = 1;
+	return shouldUpdate;
+}
+
 /** FUNZIONI PER SETTARE VARIABILI **/
 void __init__(Image* surface_t, Image* elevation_t, sem_t* world_sem_t, sem_t* thread_sem_t, sem_t* UDPEXEC_t){
 	
@@ -33,34 +38,15 @@ void __init__(Image* surface_t, Image* elevation_t, sem_t* world_sem_t, sem_t* t
 		shouldThread[i] = 0;
 	}
 	
-	cancelThread = calloc(1, sizeof(sem_t));
+	cancelThread = (sem_t*) calloc(1, sizeof(sem_t));
 	sem_init(cancelThread, 0, 0);
 	
 	UDPEXEC = UDPEXEC_t;
 	world_sem = world_sem_t;
 	thread_sem = thread_sem_t;
+	
 	time(&curr_time);
 	fprintf(stderr, "%s%sRisorse inizializzate\n", ctime(&curr_time), SERVER);
-}
-
-int set_global_communicate(){
-	shouldCommunicate = 1;
-	return shouldCommunicate;
-}
-
-int set_global_update(){
-	shouldUpdate = 1;
-	return shouldUpdate;
-}
-
-int reset_update(){
-	shouldUpdate = 0;
-	return shouldUpdate;
-}
-
-int reset_communicate(){
-	shouldCommunicate = 0;
-	return shouldCommunicate;
 }
 
 /** HANDLER PER PACCHETTI RICEVUTI VIA TCP PER SERVER **/
@@ -77,6 +63,7 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 			Packet_free(&id_packet->header);
 			return 0;
 		}
+		
 		Packet_free(&id_packet->header);
 
 		IdPacket* toSend = (IdPacket*) calloc(1, sizeof(IdPacket));
@@ -87,8 +74,6 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 		toSend->header = head;
 		
 		msg_len = Packet_serialize(SEND, &toSend->header);
-		
-		Packet_free(&toSend->header);
 		return msg_len;
 	}
 
@@ -110,8 +95,10 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 			toSend->header= head;
 			msg_len = Packet_serialize(SEND, &toSend->header);
 			sem_post(world_sem);
+			//Packet_free(&toSend->header);
 			return msg_len;
 		}
+		
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta getsurface ricevuta da %d!\n", ctime(&curr_time), TCP, id);
 		
@@ -121,6 +108,8 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 		toSend->header= head;
 
 		msg_len = Packet_serialize(SEND, &toSend->header);
+		//Packet_free(&toSend->header);
+		
 		return msg_len;
 	}
 
@@ -235,14 +224,14 @@ void * server_tcp_routine(void* arg){
 		if(msg_len < 1)continue;
 		time(&curr_time);
 		fprintf(stderr, "%s%sProvo ad inviare %d bytes da parte di %d\n", ctime(&curr_time), TCP, msg_len,tcpArg.idx);
-		msg_len = send(socket, SEND, msg_len, MSG_NOSIGNAL);
+		msg_len = send(socket, SEND, msg_len, 0);
 		if(msg_len == -1 && errno != EINTR){
-			break;
 			time(&curr_time);
 			fprintf(stderr, "%s%sTIMEOUT da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
+			break;
 		}
 		time(&curr_time);
-		fprintf(stderr, "%s%sDati inviati da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
+		//fprintf(stderr, "%s%sDati inviati da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 		
 		free(RECEIVE);
 		free(SEND);
@@ -273,7 +262,7 @@ void * server_udp_routine(void* arg){
 	shouldUpdate = 1;
 	/** CREO SOCKET PER LA UDP +*/
 	socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
-	ERROR_HELPER_LOGGER(ret, "Errore nella socket");
+	ERROR_HELPER(ret, "Errore nella socket");
 	
 	/** SETTO IL SOCKET RIUSABILE, IN SEGUITO A CRASH POTRÀ ESSERE RIUSATO **/
 	int reuseaddr_opt = 1;
@@ -283,9 +272,9 @@ void * server_udp_routine(void* arg){
 	tv.tv_usec 	= 0;
 	
 	ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
-	ERROR_HELPER_LOGGER(ret, "Errore socketOpt");
+	ERROR_HELPER(ret, "Errore socketOpt");
 	ret = setsockopt(socket_udp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-	ERROR_HELPER_LOGGER(ret, "Errore socketOpt");
+	ERROR_HELPER(ret, "Errore socketOpt");
 	
 	/** EFFETTO IL BINDING DELL'INDIRIZZO AD UN INTERFACCIA **/
 	struct sockaddr_in my_addr = {0};
@@ -294,7 +283,7 @@ void * server_udp_routine(void* arg){
 	my_addr.sin_addr.s_addr	= INADDR_ANY;
 		
 	ret = bind(socket_udp, (struct sockaddr*) &my_addr, sizeof(my_addr));
-	ERROR_HELPER_LOGGER(ret, "Errore bind");
+	ERROR_HELPER(ret, "Errore bind");
 	
 	sem_wait(world_sem);
 	Vehicle* v = World_getVehicle(&w, id);
@@ -313,7 +302,7 @@ void * server_udp_routine(void* arg){
 		if(ret == -1 && errno != EAGAIN){
 			time(&curr_time);
 			fprintf(stderr, "%s%sTIMEOUT da parte di %d\n", ctime(&curr_time), UDP, param.idx);
-			ERROR_HELPER_LOGGER(ret, "ERRORE TIMEOUT");
+			ERROR_HELPER(ret, "ERRORE TIMEOUT");
 		}
 		
 		server_udp_packet_handler(RECEIVE,&param);
@@ -354,7 +343,7 @@ void * server_udp_routine(void* arg){
 			ret = sendto(current->list.socket_udp, SEND, msg_len, 0, &client, (socklen_t) addrlen);		
 			char string[100];
 			sprintf(string, "Errore nella send to id:%d\n", id);
-			ERROR_HELPER_LOGGER(ret, "string");
+			ERROR_HELPER(ret, "string");
 		}
 		sem_post(world_sem);
 		
@@ -365,11 +354,11 @@ void * server_udp_routine(void* arg){
 		free(RECEIVE);
 		
 		time(&curr_time);
-		fprintf(stderr, "%s%sCiclo udp terminato da parte di %d\n", ctime(&curr_time), UDP, param.idx);
-		usleep(10000);
+		//usleep(10000);
 	}
 	sem_post(cancelThread);
 	
+	close(socket_udp);
 	time(&curr_time);
 	fprintf(stderr, "%s%sComunicazione udp terminata da parte di %d\n", ctime(&curr_time), UDP, param.idx);
 	sem_wait(thread_sem);	
@@ -408,9 +397,19 @@ void print_all_user(){
 void quit_server(){
 	if(shouldCommunicate) shouldCommunicate = 0;
 	World_destroy(&w);
+	
+	Image_free(surface);
+	Image_free(elevation);
+		
+	sem_destroy(cancelThread);
+	sem_destroy(thread_sem);
+	sem_destroy(world_sem);
+	sem_destroy(UDPEXEC);
+	
+	free(cancelThread);
+	free(thread_sem);
+	free(world_sem);
+	free(UDPEXEC);
 }
 
-void shutDown_thead(int id){
-	shouldThread[id] = 0;
-	if(DEBUG)printf("%sSetto shouldThread: %d\n", SERVER, shouldThread[id]);
-}
+

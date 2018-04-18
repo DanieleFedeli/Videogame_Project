@@ -35,14 +35,6 @@
 #define ERROR_HELPER(ret, msg)          GENERIC_ERROR_HELPER((ret < 0), errno, msg)
 #define PTHREAD_ERROR_HELPER(ret, msg)  GENERIC_ERROR_HELPER((ret != 0), ret, msg)
 
-//MACRO PER IL LOGGER
-#define ERROR_HELPER_LOGGER(ret, message)  do {         \
-            if (ret < 0) {                                              \
-                fprintf(stderr, "%s: %s\n", message, strerror(errno));  \
-                exit(EXIT_FAILURE);                                     \
-            }                                                           \
-        } while (0)
-
 
 struct args{ //USED BY A THREAD IN SERVER
 	int tcp_sock;

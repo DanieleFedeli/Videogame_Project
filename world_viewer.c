@@ -331,6 +331,7 @@ void WorldViewer_init(WorldViewer* viewer,
 }
 
 void WorldViewer_draw(WorldViewer* viewer){
+	glutInit(NULL, 0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();

@@ -23,7 +23,6 @@ OBJS = vec3.o\
        so_game_protocol.o\
        so_game_server.o\
        so_game_client.o\
-       logger.o\
 
 HEADERS=helpers.h\
 	image.h\
@@ -36,7 +35,7 @@ HEADERS=helpers.h\
 	world.h\
 	world_viewer.h\
 	handler.h\
-	logger.h\
+
 
 
 %.o:	%.c $(HEADERS)
@@ -62,3 +61,4 @@ test_packets_serialization: test_packets_serialization.c libso_game.a
 
 clean:
 	rm -rf *.o *~  $(BINS) *.gch
+	rm ./Logger/*

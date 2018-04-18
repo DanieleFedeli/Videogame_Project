@@ -12,15 +12,23 @@
 #include "handler.h"
 #include "utils.h"
 #include "image.h"
-#include "logger.h"
 
 
-int shouldAccept;//VARIABILI GLOBALI USATE NEI THREAD
+int shouldAccept, logger_shouldStop;//VARIABILI GLOBALI USATE NEI THREAD
 pid_t logger_pid;
 time_t curr_time;
+sem_t* UDPEXEC;
+
+#define ERROR_HELPER_LOGGER(ret, message)  do {         								\
+            if (ret < 0) {                                              \
+                fprintf(stderr, "%s: %s\n", message, strerror(errno));  \
+                kill(logger_pid, SIGTERM);                              \
+                exit(EXIT_FAILURE);                                     \
+            }                                                           \
+        } while (0)
+
 
 /** SIGNAL HANDLER **/
-
 void action(int sig, siginfo_t *siginfo, void* context){
 	
 	switch(sig){
@@ -31,20 +39,17 @@ void action(int sig, siginfo_t *siginfo, void* context){
 			shouldAccept = 0;
 			quit_server();
 		}
-		case SIGSEGV:
-		{
-			ERROR_HELPER_LOGGER(-1, "SEGMENTATION FAULT!!!\n");
-		}
 		case SIGALRM:
 		{
 			set_global_update();
-			
 			alarm(2);
 		}
 	}
 }
 
-sem_t* UDPEXEC;
+void action_logger(int sig, siginfo_t *siginfo, void* context){
+	logger_shouldStop = 1;
+}
 
 /** ROUTINE CHE ASCOLTA LE CONNESSIONI IN ENTRATA E LANCIA UN TCP_ROUTINE PER CONNESSIONE **/
 void * thread_generatore(void* arg){
@@ -60,14 +65,12 @@ void * thread_generatore(void* arg){
 		struct sockaddr_in client;
 		
 		/** ACCETTA CONNESSIONI IN ENTRATA**/
-		
 		new_sock = accept(socket_tcp, (struct sockaddr*) &client, (socklen_t*) &addrlen);
 		if(new_sock == -1){ 
 			sleep(1);
 			continue;
 			
 		}
-		if(DEBUG) print_all_user(); 
 		
 		time(&curr_time);
 		fprintf(stderr, "%s%sConnessione accettata. ID: %d\n", ctime(&curr_time), SERVER, new_sock);
@@ -81,8 +84,7 @@ void * thread_generatore(void* arg){
 		ret = pthread_detach(tcp_handler);
 		PTHREAD_ERROR_HELPER(ret, "Errore detach thread");
 		
-		/** ASPETTO L'AGGIUNTA DEL VEICOLO E LANCIO IL THREAD CON LA FUNZIONE UDP_ROUTINE **/
-		
+		/** ASPETTO L'AGGIUNTA DEL VEICOLO E LANCIO IL THREAD CON LA FUNZIONE UDP_ROUTINE **/		
 		sem_wait(UDPEXEC);
 		ret = pthread_create(&udp_handler, NULL, server_udp_routine, (void*) param);
 		PTHREAD_ERROR_HELPER(ret, "Errore nella creazione del thread");
@@ -91,25 +93,70 @@ void * thread_generatore(void* arg){
 		ret = pthread_detach(udp_handler);
 		PTHREAD_ERROR_HELPER(ret, "Errore detach thread");
 		
-		sleep(1);
-		
+		sleep(0.5);	
 	}
+	
 	time(&curr_time);
 	fprintf(stderr, "%s%sChiusura server!\n", ctime(&curr_time), SERVER);
 	pthread_exit(NULL);
 }
 
 
+void startLogger(int logfile_desc, int logging_pipe[2]){
+	int ret;
+
+  ret = close(logging_pipe[1]);
+  ERROR_HELPER(ret, "Cannot close pipe's write descriptor in Logger");
+
+  char* toWrite;
+  logger_shouldStop = 0;
+  while(1) {
+		int msg_len = 0;
+		toWrite = (char*) calloc(BUFFERSIZE, sizeof(char));
+		
+		while (1) {
+			ret = read(logging_pipe[0], toWrite + msg_len, 1);
+      if (ret == -1 && errno == EINTR) continue;
+      
+      ERROR_HELPER(ret, "Cannot read from pipe");
+      
+      if (ret == 0) break;
+      if (toWrite[msg_len++] == '\n') break;
+    }
+
+		int written_bytes = 0;
+		int bytes_left = msg_len;
+		while (bytes_left > 0) {
+      ret = write(logfile_desc, toWrite + written_bytes, bytes_left);
+      
+      if (ret == -1 && errno == EINTR) continue;
+      ERROR_HELPER(ret, "Cannot write to log file");
+
+      bytes_left -= ret;
+      written_bytes += ret;
+    }
+    
+    free(toWrite);
+		if (logger_shouldStop) break;
+		
+   }
+
+  ret = close(logfile_desc);
+  ERROR_HELPER(ret, "Cannot close log file from Logger");
+
+  close(logging_pipe[0]); // what happens when you write on a closed pipe?
+  ERROR_HELPER(ret, "Cannot close pipe's read descriptor in Logger");
+
+  exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char **argv) {
   char* elevation_filename = ELEVATION_FILENAME;
   char* texture_filename = SURFACE_FILENAME;
-  char* vehicle_texture_filename="./images/arrow-right.ppm";
   printf("loading elevation image from %s ... ", elevation_filename);
 
-  // load the images
   Image* surface_elevation = Image_load(elevation_filename);
   Image* surface_texture = Image_load(texture_filename);
-  Image* vehicle_texture = Image_load(vehicle_texture_filename);
 
 	/** DICHIARAZIONE VARIABILI DI RETE **/
 	int ret, socket_tcp;
@@ -144,7 +191,6 @@ int main(int argc, char **argv) {
   /** SETTO VARIABILI GLOBALI **/
   shouldAccept			= 1;
 
-
 	/** CREAZIONE DEL LOG **/
 	char* logfile_name = "./Logger/server-logger.txt";
 	int logfile_desc = open(logfile_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -157,13 +203,28 @@ int main(int argc, char **argv) {
 	logger_pid = fork();
 	if(logger_pid == -1)	ERROR_HELPER(-1, "Impossibile creare figlio logger");
 	else if(logger_pid == 0){
+		struct sigaction act;
+		memset(&act, '\0', sizeof(act));
+
+		act.sa_sigaction = &action_logger;
+		act.sa_flags		 = SA_SIGINFO;
+
+		ret = sigaction(SIGINT, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGQUIT, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		ret = sigaction(SIGTERM, &act, NULL);
+		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
+		
 		ret = close(socket_tcp);
 		ERROR_HELPER(ret, "Impossibile chiudere il listening socket");
 		
 		startLogger(logfile_desc, logger_pipe);
+		
+		exit(EXIT_SUCCESS);
+		
 	}
 	else{
-		/** PARTE PARALLELA **/
 		close(logfile_desc);
 		close(logger_pipe[0]);
 		
@@ -206,8 +267,6 @@ int main(int argc, char **argv) {
 		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
 		ret = sigaction(SIGTERM, &act, NULL);
 		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGSEGV, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
 		ret = sigaction(SIGALRM, &act, NULL);
 		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
 		alarm(2);
@@ -219,11 +278,9 @@ int main(int argc, char **argv) {
 		ret = close(logger_pipe[1]);
 		ERROR_HELPER_LOGGER(ret, "Errore nella chiusura della pipe");
 		
-		/** DEALLOCAZIONE RISOSE **/	
-		Image_free(surface_elevation);
-		Image_free(surface_texture);
-		Image_free(vehicle_texture);
-
+		/** DEALLOCAZIONE RISOSE **/		
+		close(socket_tcp);
+		
 		exit(EXIT_SUCCESS);
 	}
 }
