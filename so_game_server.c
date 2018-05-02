@@ -48,6 +48,7 @@ void action(int sig, siginfo_t *siginfo, void* context){
 }
 
 void action_logger(int sig, siginfo_t *siginfo, void* context){
+	sleep(3);
 	logger_shouldStop = 1;
 }
 
@@ -203,6 +204,9 @@ int main(int argc, char **argv) {
 	logger_pid = fork();
 	if(logger_pid == -1)	ERROR_HELPER(-1, "Impossibile creare figlio logger");
 	else if(logger_pid == 0){
+		Image_free(surface_elevation);
+		Image_free(surface_texture);
+		
 		struct sigaction act;
 		memset(&act, '\0', sizeof(act));
 
@@ -278,7 +282,8 @@ int main(int argc, char **argv) {
 		ret = close(logger_pipe[1]);
 		ERROR_HELPER_LOGGER(ret, "Errore nella chiusura della pipe");
 		
-		/** DEALLOCAZIONE RISOSE **/		
+		kill(logger_pid, SIGKILL);
+		/** DEALLOCAZIONE RISOSE **/	
 		close(socket_tcp);
 		
 		exit(EXIT_SUCCESS);

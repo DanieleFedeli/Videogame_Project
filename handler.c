@@ -52,89 +52,82 @@ void __init__(Image* surface_t, Image* elevation_t, sem_t* world_sem_t, sem_t* t
 /** HANDLER PER PACCHETTI RICEVUTI VIA TCP PER SERVER **/
 int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Image** texture,const struct args* arg){
 	int msg_len = 0;
-	PacketHeader* header = (PacketHeader*)PACKET;
+	PacketHeader header = *(PacketHeader*)PACKET;
 	
-	if(header->type == GetId){
+	if(header.type == GetId){
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta id ricevuta da %d\n", ctime(&curr_time), TCP, id);
-		IdPacket* id_packet = (IdPacket*)Packet_deserialize(PACKET, header->size);
+		IdPacket id_packet = *(IdPacket*)Packet_deserialize(PACKET, header.size);
 
-		if(id_packet->id != -1){
-			Packet_free(&id_packet->header);
-			return 0;
-		}
+		if(id_packet.id != -1) return 0;
 		
-		Packet_free(&id_packet->header);
-
-		IdPacket* toSend = (IdPacket*) calloc(1, sizeof(IdPacket));
+		IdPacket toSend;
 		PacketHeader head;
 
-		head.type=GetId;
-		toSend->id = id;
-		toSend->header = head;
+		head.type = GetId;
+		toSend.id = id;
+		toSend.header = head;
 		
-		msg_len = Packet_serialize(SEND, &toSend->header);
+		msg_len = Packet_serialize(SEND, &toSend.header);
 		return msg_len;
 	}
 
-	else if(header->type == GetTexture){
+	else if(header.type == GetTexture){
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta gettexture ricevuta da %d\n", ctime(&curr_time), TCP, id);
-		ImagePacket* img_packet = (ImagePacket*)Packet_deserialize(PACKET, header->size);
-		ImagePacket* toSend = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		ImagePacket img_packet = *(ImagePacket*)Packet_deserialize(PACKET, header.size);
+		ImagePacket toSend;
 		PacketHeader head;
 		
-		if(img_packet->id > 0){
+		if(img_packet.id > 0){
 			time(&curr_time);
-			fprintf(stderr, "%s%sCerco texture di %d!\n", ctime(&curr_time), TCP, img_packet->id);
+			fprintf(stderr, "%s%sCerco texture di %d!\n", ctime(&curr_time), TCP, img_packet.id);
 			sem_wait(world_sem);
-			Vehicle* v = World_getVehicle(&w, img_packet->id);
+			Vehicle* v = World_getVehicle(&w, img_packet.id);
 			head.type = PostTexture;
-			toSend->image = v->texture;
-			toSend->id 		= v->id;
-			toSend->header= head;
-			msg_len = Packet_serialize(SEND, &toSend->header);
+			
+			toSend.image = v->texture;
+			toSend.id 		= v->id;
+			toSend.header= head;
+			msg_len = Packet_serialize(SEND, &toSend.header);
 			sem_post(world_sem);
-			//Packet_free(&toSend->header);
+			
 			return msg_len;
 		}
-		
+
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta getsurface ricevuta da %d!\n", ctime(&curr_time), TCP, id);
 		
 		head.type	 		= PostTexture;
-		toSend->image = surface;
-		toSend->id		= 0;
-		toSend->header= head;
+		toSend.image = surface;
+		toSend.id		= 0;
+		toSend.header= head;
 
-		msg_len = Packet_serialize(SEND, &toSend->header);
-		//Packet_free(&toSend->header);
-		
+		msg_len = Packet_serialize(SEND, &toSend.header);
 		return msg_len;
 	}
 
-	else if(header->type == GetElevation){
+	else if(header.type == GetElevation){		
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta getelevation ricevuta da %d!\n", ctime(&curr_time), TCP, id);
-		ImagePacket* toSend = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		ImagePacket toSend;
 		PacketHeader head;
 
 		head.type			= PostElevation;
-		toSend->image = elevation;
-		toSend->id		= 0;
-		toSend->header= head;
+		toSend.image = elevation;
+		toSend.id		= 0;
+		toSend.header= head;
 		
-		msg_len = Packet_serialize(SEND, &toSend->header);
-		//free(toSend);
+		msg_len = Packet_serialize(SEND, &toSend.header);
 		return msg_len;
 	}
 
-	else if(header->type == PostTexture){
+	else if(header.type == PostTexture){
 		time(&curr_time);
 		fprintf(stderr, "%s%sRichiesta posttexture ricevuta da %d!\n", ctime(&curr_time), TCP, id);
-		ImagePacket* img_packet = (ImagePacket*)Packet_deserialize(PACKET, header->size);
+		ImagePacket img_packet = *(ImagePacket*)Packet_deserialize(PACKET, header.size);
 		sem_wait(world_sem);
-		Vehicle_init(v, &w, id, img_packet->image);
+		Vehicle_init(v, &w, id, img_packet.image);
 		World_addVehicle(&w, v);
 		sem_post(UDPEXEC);
 		sem_post(world_sem);
@@ -189,15 +182,16 @@ void * server_tcp_routine(void* arg){
 	Vehicle* v = (Vehicle*) calloc(1, sizeof(Vehicle));
 	Image* texture;
 	int count = 0;
-	char* RECEIVE, *SEND;
+	char SEND[BUFFERSIZE], RECEIVE[BUFFERSIZE] = {'\0'};
+	
+	memset((void*) &SEND, '\0', BUFFERSIZE);
+	//memset((void*) &RECEIVE, '\0', BUFFERSIZE);
+	
 	/** QUESTO CICLO SERVE PER LEGGERE COSA VUOLE IL CLIENT, PROCESSARE LA RISPOSTA ED INVIARLA **/
 	time(&curr_time);
 	fprintf(stderr, "%s%sInizio ciclo tcp di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 	while(shouldCommunicate && shouldThread[tcpArg.idx] && count < 5){
 		bytes_read = 0;
-		RECEIVE = (char*) calloc(BUFFERSIZE, sizeof(char));
-		SEND 		= (char*) calloc(BUFFERSIZE, sizeof(char));
-
 		/** RICEVO DAL SOCKET**/
 		bytes_read = recv(socket, RECEIVE, BUFFERSIZE, MSG_NOSIGNAL);
 
@@ -212,16 +206,15 @@ void * server_tcp_routine(void* arg){
 			fprintf(stderr, "%s%sRicevuti %d bytes di %d. Disconnessione.\n", ctime(&curr_time), TCP, bytes_read, tcpArg.idx);
 			break;
 		}
-		
-		
-		
+				
 		/** CHIAMO UN HANDLER PER GENERARE LA RISPOSTA**/
 		msg_len = server_tcp_packet_handler(RECEIVE, SEND, v, tcpArg.idx, &texture, &tcpArg);
 		time(&curr_time);
 		fprintf(stderr, "%s%sPacchetto analizzato da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 		
 		/** INVIO RISPOSTA AL CLIENT**/
-		if(msg_len < 1)continue;
+		if(msg_len < 1) continue;
+		
 		time(&curr_time);
 		fprintf(stderr, "%s%sProvo ad inviare %d bytes da parte di %d\n", ctime(&curr_time), TCP, msg_len,tcpArg.idx);
 		msg_len = send(socket, SEND, msg_len, 0);
@@ -231,10 +224,6 @@ void * server_tcp_routine(void* arg){
 			break;
 		}
 		time(&curr_time);
-		//fprintf(stderr, "%s%sDati inviati da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
-		
-		free(RECEIVE);
-		free(SEND);
 	}
 	
 	sem_wait(thread_sem);	
@@ -242,20 +231,23 @@ void * server_tcp_routine(void* arg){
 	fprintf(stderr, "%s%sSetto shouldThread a 0 da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 	shouldThread[tcpArg.idx] = 0;
 	sem_wait(cancelThread);
-	World_detachVehicle(&w, v);
+	Vehicle* toDelete = World_detachVehicle(&w, v);
+	Vehicle_destroy(toDelete);
 	sem_post(thread_sem);	
+	fprintf(stderr, "%s%sVeicolo %d eliminato\n", ctime(&curr_time), TCP, tcpArg.idx);
 	
-	close(socket);
+	
 	time(&curr_time);
 	fprintf(stderr, "%s%sChiusura thread da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
+	
+	close(socket);
 	pthread_exit(NULL);
 }
 
 void * server_udp_routine(void* arg){
 	struct sockaddr client = {0};
 	struct args param = *(struct args*)arg;
-	char* RECEIVE;
-	char* SEND;
+	char RECEIVE[BUFF_UDP] = {'\0'}, SEND[BUFF_UDP] = {'\0'};
 	int ret = 0, msg_len = 0, addrlen, id = param.idx;
 	
 	int socket_udp;
@@ -292,13 +284,10 @@ void * server_udp_routine(void* arg){
 	
 	time(&curr_time);
 	fprintf(stderr, "%s%sInizio comunicazione UDP da parte di %d\n", ctime(&curr_time), UDP, param.idx);
-	while(shouldThread[id] && shouldCommunicate){
-
-		RECEIVE = (char*)calloc(BUFFERSIZE, sizeof(char));
-		SEND = (char*)calloc(BUFFERSIZE, sizeof(char));
-		
+	
+	while(shouldThread[id] && shouldCommunicate){	
 		addrlen = sizeof(struct sockaddr);
-		ret = recvfrom(socket_udp, RECEIVE, BUFFERSIZE, 0, &client, (socklen_t*) &addrlen);
+		ret = recvfrom(socket_udp, RECEIVE, BUFF_UDP, 0, &client, (socklen_t*) &addrlen);
 		if(ret == -1 && errno != EAGAIN){
 			time(&curr_time);
 			fprintf(stderr, "%s%sTIMEOUT da parte di %d\n", ctime(&curr_time), UDP, param.idx);
@@ -349,13 +338,10 @@ void * server_udp_routine(void* arg){
 		
 		//DEALLOCO RISORSE
 		Packet_free(&wup->header);
-		
-		free(SEND);
-		free(RECEIVE);
-		
 		time(&curr_time);
 		//usleep(10000);
 	}
+	
 	sem_post(cancelThread);
 	
 	close(socket_udp);
@@ -396,8 +382,9 @@ void print_all_user(){
 
 void quit_server(){
 	if(shouldCommunicate) shouldCommunicate = 0;
-	World_destroy(&w);
+	sleep(3);
 	
+	World_destroy(&w);
 	Image_free(surface);
 	Image_free(elevation);
 		
@@ -410,6 +397,8 @@ void quit_server(){
 	free(thread_sem);
 	free(world_sem);
 	free(UDPEXEC);
+	time(&curr_time);
+	fprintf(stderr, "%s%sRisorse deallocate\n", ctime(&curr_time), SERVER);
 }
 
 

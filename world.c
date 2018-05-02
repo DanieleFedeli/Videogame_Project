@@ -14,6 +14,7 @@ void World_destroy(World* w) {
   ListItem* item=w->vehicles.first;
   while(item){
     Vehicle* v=(Vehicle*)item;
+    free(v->texture);
     Vehicle_destroy(v);
     item=item->next;
     free(v);

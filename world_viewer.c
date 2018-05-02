@@ -331,7 +331,6 @@ void WorldViewer_init(WorldViewer* viewer,
 }
 
 void WorldViewer_draw(WorldViewer* viewer){
-	glutInit(NULL, 0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -411,7 +410,7 @@ void WorldViewer_runGlobal(World* world,
   glutKeyboardFunc(keyPressed);
   glutReshapeFunc(reshape);
   WorldViewer_init(&viewer, world, self);
-
+  
   // run the main GL loop
   glutMainLoop();
 

@@ -125,9 +125,9 @@ void Packet_free(PacketHeader* h) {
   case PostElevation:
   {
     ImagePacket* img_packet=(ImagePacket*) h;
-    if (img_packet->image){
-      Image_free(img_packet->image);
-    }
+    //if (img_packet->image){
+      //Image_free(img_packet->image);
+    //}
     free (img_packet);
   }
   }

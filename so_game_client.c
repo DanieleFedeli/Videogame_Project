@@ -10,94 +10,68 @@
 #include <pthread.h>
 #include <time.h>
 
+#include "world_viewer.h"
 #include "image.h"
 #include "world.h"
 #include "vehicle.h"
-#include "world_viewer.c"
 #include "so_game_protocol.h"
 #include "utils.h"
 
 
 sem_t *world_sem, *request;
-WorldViewer viewer;
 char* server_address;
-int shouldUpdate, logger_shouldStop, window, socket_tcp, socket_udp;
-int my_id;
+int shouldUpdate, window, socket_tcp, socket_udp, my_id;
+Image *map_elevation, *map_texture, *my_texture;
+time_t curr_time;
 World world;		
 Vehicle* vehicle; 
-pid_t logger_pid;
-time_t curr_time;
 
-/** MACRO USATA PER LA GESTIONE ERRORI **/
-#define ERROR_HELPER_LOGGER(ret, message)  do {         								\
-            if (ret < 0) {                                              \
-                fprintf(stderr, "%s: %s\n", message, strerror(errno));  \
-                kill(logger_pid, SIGTERM);                              \
-                exit(EXIT_FAILURE);                                     \
-            }                                                           \
-        } while (0)
-        
-/**FUNZIONE CHIAMATA ALLA RICEZIONE DI SIGINT/SIGQUIT/SIGTERM DA PARTE DEL LOGGER**/
-void action_logger(int sig, siginfo_t *siginfo, void* context){
-	logger_shouldStop = 1;
-}
 
 /**FUNZIONE CHIAMATA ALLA RICEZIONE DI SIGINT/SIGQUIT/SIGTERM/SIGSEGV DA PARTE DEL CLIENT**/
 void action(int sig, siginfo_t *siginfo, void* context){
-		shouldUpdate = 0;
-		WorldViewer_destroy(&viewer);
-}
+	switch(sig){
+		case SIGQUIT:
+		case SIGTERM:
+		case SIGINT:
+		{
+			/** SO CHE NON CI VANNO FUNZIONI PESANTI NELL'HANDLER DEI SEGNALI,
+			 * MA ERO OBBLIGATO VISTO CHE NON SI PUÒ USCIRE DAL CICLO GLUT*/
+			shouldUpdate = 0;
+			sleep(1);
+			
+			close(socket_tcp);
+			close(socket_udp);
+			
+			sem_destroy(world_sem);
+			sem_destroy(request);
+			free(world_sem);
+			free(request);
+			World_destroy(&world);
 
-/** FUNZIONE DEL LOGGER **/
-void startLogger(int logfile_desc, int logging_pipe[2]){
-	int ret;
-
-  ret = close(logging_pipe[1]); //CHIUSURA DELLA PIPE DI SCRITTURA
-  ERROR_HELPER(ret, "Cannot close pipe's write descriptor in Logger");
-
-  char* toWrite;
-  logger_shouldStop = 0; 
-  
-  /** CICLO DI ACQUISIZIONE DATI **/
-  while(1) {
-		int msg_len = 0;
-		toWrite = (char*) calloc(BUFFERSIZE, sizeof(char));
+			
+			exit(0);
+		}
 		
-		while (1) {
-			ret = read(logging_pipe[0], toWrite + msg_len, 1);
-      if (ret == -1 && errno == EINTR) continue;
-      
-      ERROR_HELPER(ret, "Cannot read from pipe");
-      
-      if (ret == 0) break;
-      if (toWrite[msg_len++] == '\n') break;
-    }
-
-		int written_bytes = 0;
-		int bytes_left = msg_len;
-		while (bytes_left > 0) {
-      ret = write(logfile_desc, toWrite + written_bytes, bytes_left);
-      
-      if (ret == -1 && errno == EINTR) continue;
-      ERROR_HELPER(ret, "Cannot write to log file");
-
-      bytes_left -= ret;
-      written_bytes += ret;
-    }
-    
-    free(toWrite);
-		if (logger_shouldStop) break;
+		case SIGSEGV:
+		{
+			printf("%sSEGMENTATION\n", CLIENT);
+			shouldUpdate = 0;
+			sleep(2);
+			
+			close(socket_tcp);
+			close(socket_udp);
+			sem_destroy(world_sem);
+			sem_destroy(request);
+			free(world_sem);
+			free(request);
+			World_destroy(&world);
+			
+			//Image_free(map_elevation);
+			//Image_free(map_texture);			
+			exit(0);
+		}
 		
-   }
-
-	/** CHIUSURA LOGGER **/
-  ret = close(logfile_desc);
-  ERROR_HELPER(ret, "Cannot close log file from Logger");
-
-  close(logging_pipe[0]);
-  ERROR_HELPER(ret, "Cannot close pipe's read descriptor in Logger");
-
-  exit(EXIT_SUCCESS);
+	}
 }
 
 /** FUNZIONE USATA PER OTTENERE VARIABILI DI UN VEICOLO APPENA CONNESSO **/
@@ -121,9 +95,9 @@ void* getter(void* arg){
 		msg_len = Packet_serialize(SEND, &image_packet->header);
 	
 		ret = send(param.tcp_sock, SEND, msg_len, 0);
-		ERROR_HELPER_LOGGER(ret, "Errore nella send");
+		ERROR_HELPER(ret, "Errore nella send");
 		ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, 0);
-		ERROR_HELPER_LOGGER(ret, "Errore nella receive");
+		ERROR_HELPER(ret, "Errore nella receive");
 		
 		time(&curr_time);
 		fprintf(stderr, "%s%sRicevuti %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, ret, my_id);
@@ -191,7 +165,10 @@ int packet_handler_udp(char* PACKET, char* SEND){
 			}
 		}
 		
-		if(world.vehicles.size == wup->num_vehicles) return 0; //NON CI SONO VEICOLO INATTIVI
+		if(world.vehicles.size == wup->num_vehicles) {
+			Packet_free(&wup->header);
+			return 0; //NON CI SONO VEICOLO INATTIVI
+		}
 		
 		/** ROUTINE PER RICERCARE IL VEICOLO INATTIVO ED ELIMINARLO**/
 		time(&curr_time);
@@ -227,7 +204,9 @@ int packet_handler_udp(char* PACKET, char* SEND){
 		}
 		
 		sem_post(world_sem);
+		Packet_free(&wup->header);
 		return 0;
+		
 	}
 	
 	else return -1;
@@ -250,8 +229,7 @@ void* client_udp_routine(void* arg){
 	
 	/** CICLO DI ACQUISIZIONI DATI **/
 	while(shouldUpdate){
-		SEND 		= (char*) calloc(BUFFERSIZE, sizeof(char*));
-		RECEIVE = (char*) calloc(BUFFERSIZE, sizeof(char*));
+		SEND 		= (char*) calloc(BUFF_UDP, sizeof(char));
 		
 		/** CREAZIONE PACCHETTO **/
 		PacketHeader header;
@@ -270,9 +248,10 @@ void* client_udp_routine(void* arg){
 		/** SERIALIZZAZIONE ED INVIO PACCHETTO**/
 		length = Packet_serialize(SEND, &vup->header);
 		ret = sendto(socket_udp, SEND, length, 0,(struct sockaddr*) &addr, length);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sendto");
+		ERROR_HELPER(ret, "Errore nella sendto");
 		length = sizeof(struct sockaddr);
-		ret = recvfrom(socket_udp, RECEIVE, BUFFERSIZE, 0,(struct sockaddr*) &addr, (socklen_t*) &length);
+		RECEIVE = (char*) calloc(BUFF_UDP, sizeof(char));
+		ret = recvfrom(socket_udp, RECEIVE, BUFF_UDP, 0,(struct sockaddr*) &addr, (socklen_t*) &length);
 		if(ret == -1){
 			time(&curr_time);
 			fprintf(stderr, "%s%sDISCONNESSIONE PER TIMEOUT da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
@@ -287,107 +266,176 @@ void* client_udp_routine(void* arg){
 		free(SEND);
 		free(RECEIVE);
 	}
-
+	
+	/** CLIENT DISCONNESSO **/
+	time(&curr_time);
+	fprintf(stderr, "%s%sDisconnessione da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	
+	close(param->logger_pipe);
+	free(arg);
+	
 	pthread_exit(NULL);
 }
 
 /** FUNZIONE USATA APPENA IL CLIENT SI CONNETTE VIA TCP PER RICHIEDERE TEXTURE **/
-void getter_TCP(Image* my_texture, Image** map_elevation, Image** map_texture){
+int getter_TCP(void){
 	//VIENE USATA SLEEP(1) ALLA FINE DI OGNI RICHIESTA AL FINE DI NON FAR ACCAVALLARE
 	//LE RICHIESTA AL CLIENT
 	
   char* id_buffer 					= (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONI DI ID
   char* image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONE DI IMG
-  int ret, length;
+  int ret, length, result = 1, count = 0;
   PacketHeader header, im_head;
   
+  while(result && count < 5){
   /** ID PART**/
-  time(&curr_time);
-  fprintf(stderr, "%s%sPreparazione richista ID da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-  IdPacket* id_packet = (IdPacket*)calloc(1, sizeof(IdPacket));
-
-  header.type   			= GetId;
-  id_packet -> header = header;
-  id_packet -> id     = -1;
+	  time(&curr_time);
+	  fprintf(stderr, "%s%sPreparazione richista ID da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	  IdPacket* id_packet = (IdPacket*)calloc(1, sizeof(IdPacket));
 	
-  length = Packet_serialize(id_buffer, &id_packet->header);
-  time(&curr_time);
-  fprintf(stderr, "%s%sBytes scritti nel buffer %d da parte di %d\n", ctime(&curr_time), CLIENT, length, my_id);
+	  header.type   			= GetId;
+	  id_packet -> header = header;
+	  id_packet -> id     = -1;
+		
+	  length = Packet_serialize(id_buffer, &id_packet->header);
+	  time(&curr_time);
+	  fprintf(stderr, "%s%sBytes scritti nel buffer %d da parte di %d\n", ctime(&curr_time), CLIENT, length, my_id);
+		
+		ret = send(socket_tcp, id_buffer, length, 0);
+		ERROR_HELPER(ret, "Errore nella send");
+		Packet_free(&id_packet->header);
+		
+		ret = recv(socket_tcp, id_buffer, length, 0);
+		ERROR_HELPER(ret, "Errore nella recv");
+		
+	  id_packet = (IdPacket*) Packet_deserialize(id_buffer, length);
+	  my_id = id_packet -> id;
+	  time(&curr_time);
+	  fprintf(stderr, "%s%sID trovato da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	  Packet_free(&id_packet->header);
+	  
+	  if(my_id > 0) result = 0;
+	  else count++;
+	}
 	
-	ret = send(socket_tcp, id_buffer, length, 0);
-	ERROR_HELPER_LOGGER(ret, "Errore nella send");
-
-	ret = recv(socket_tcp, id_buffer, length, 0);
-	ERROR_HELPER_LOGGER(ret, "Errore nella recv");
-	
-  id_packet = (IdPacket*) Packet_deserialize(id_buffer, length);
-  my_id = id_packet -> id;
-  fprintf(stderr, "%s%sID trovato da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	result = 1;
+	if(count >= 5) return -1;
+	count ^= count;
 	sleep(1); //SLEEP DOPO OGNI RICHIESTA PER NON FAR ACCAVALLARE LE RICHIESTE
 	
 
 	/** POST TEXTURE **/
-	time(&curr_time);
-	fprintf(stderr, "%s%sPreparazione alla richiesta PostTexture da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-  ImagePacket* image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
-  im_head.type = PostTexture;
-	
-	image_packet->id		= my_id;
-  image_packet->header= im_head;
-  image_packet->image = my_texture;
-	
-  length = Packet_serialize(image_packet_buffer, &image_packet->header);
+	while(result && count < 5){
+		time(&curr_time);
+		fprintf(stderr, "%s%sPreparazione alla richiesta PostTexture da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	  ImagePacket* image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
+	  im_head.type = PostTexture;
 		
-	ret = send(socket_tcp, image_packet_buffer, length, 0);
-	time(&curr_time);
-	fprintf(stderr, "%s%sRichiesta inviata da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		image_packet->id		= my_id;
+	  image_packet->header= im_head;
+	  image_packet->image = my_texture;
+		
+	  length = Packet_serialize(image_packet_buffer, &image_packet->header);
+			
+		ret = send(socket_tcp, image_packet_buffer, length, 0);
+		time(&curr_time);
+		fprintf(stderr, "%s%sRichiesta inviata da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		Packet_free(&image_packet->header);
+		free(image_packet_buffer);
+		
+		if(ret == length) result = 0;
+		else count++;
+	}
+	
+	result = 1;
+	if(count >=5 ) return -1;
+	count ^= count;
+	
 	sleep(1);
 	
 	/** ELEVATION MAP **/
-	time(&curr_time);
-	fprintf(stderr, "%s%sPreparazione alla richiesta elevation map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char));
-	image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+	while(result && count < 5){
+		time(&curr_time);
+		fprintf(stderr, "%s%sPreparazione alla richiesta elevation map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char));
+		ImagePacket* image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		
+	  im_head.type = GetElevation;
 	
-  im_head.type = GetElevation;
-
-  image_packet -> header = im_head;
-  image_packet -> image = NULL;
-  
-  length = Packet_serialize(image_packet_buffer, &image_packet->header);
+	  image_packet -> header = im_head;
+	  image_packet -> image = NULL;
+	  
+	  length = Packet_serialize(image_packet_buffer, &image_packet->header);
+		
+		ret = send(socket_tcp, image_packet_buffer,length, 0);
+		Packet_free(&image_packet->header);
+		free(image_packet_buffer);
+		
+		image_packet_buffer = (char*)calloc(BUFFERSIZE, sizeof(ImagePacket*));
+		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
+		
+		image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
+		map_elevation = image_packet -> image;
+		Packet_free(&image_packet->header);
+		free(image_packet_buffer);
+		
+		time(&curr_time);
+		fprintf(stderr, "%s%sElevation map ricevuta da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, ret);
+		
+		if(map_elevation != NULL && ret > 15000) result = 0;
+		else count++;
+	}
 	
-	ret = send(socket_tcp, image_packet_buffer,length, 0);
+	result = 1;
+	if(count >= 5) return -1;
+	count ^= count;
 	
-	image_packet_buffer = (char*)calloc(BUFFERSIZE, sizeof(ImagePacket*));
-	ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
-	
-	image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
-	*map_elevation = image_packet -> image;
-	time(&curr_time);
-	fprintf(stderr, "%s%sElevation map ricevuta da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 	sleep(1);
 	
 	/**SURFACE MAP **/
-	time(&curr_time);
-	fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	image_packet_buffer = (char *) calloc(BUFFERSIZE, sizeof(char));
-	image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+	while(result && count < 5){
+		time(&curr_time);
+		fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		image_packet_buffer = (char *) calloc(BUFFERSIZE, sizeof(char));
+		ImagePacket* image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		
+		im_head.type = GetTexture;
+		
+		image_packet -> header = im_head;
+		image_packet -> id = 0;
+		
+		length = Packet_serialize(image_packet_buffer, &image_packet->header);
 	
-	im_head.type = GetTexture;
+		ret = send(socket_tcp, image_packet_buffer, length, 0);
+		ERROR_HELPER(ret, "Errore nella send");
+		Packet_free(&image_packet->header);
 	
-	image_packet -> header = im_head;
-	image_packet -> id = 0;
-	image_packet -> image = NULL;
+		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
+		ERROR_HELPER(ret, "Errore nella recv");
+		
+		
+		
+		if(ret < 150000){
+			count++;
+			continue;
+		}
+		
+		image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
+		map_texture = image_packet -> image;
+		free(image_packet_buffer);
+		Packet_free(&image_packet->header);
+		
+		time(&curr_time);
+		fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, ret);
+		
+		free(id_buffer);
+		
+		if(map_texture != NULL && ret > 150000) result = 0;
+	}
 	
-	length = Packet_serialize(image_packet_buffer, &image_packet->header);
-
-	ret = send(socket_tcp, image_packet_buffer, length, 0);
-	ERROR_HELPER_LOGGER(ret, "Errore nella send");
-	ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
-	ERROR_HELPER_LOGGER(ret, "Errore nella recv");
-	
-	image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
-	*map_texture = image_packet -> image;
+	result = 0;
+	if(count >= 5) return -1;
+	else return 0;
 }
 
 
@@ -396,161 +444,99 @@ int main(int argc, char **argv) {
     printf("usage: %s <server_address> <player texture>\n", argv[1]);
     exit(-1);
   }
+
 	int ret;
+	my_texture = Image_load(argv[2]);
 	
-	/** CREAZIONE LOGGER **/
-  char* logfile_name = "./Logger/client-logger.txt";
-	int logfile_desc = open(logfile_name, O_WRONLY | O_CREAT | O_APPEND, 0644);
-	ERROR_HELPER(logfile_name, "Errore nella creazione del logger");
+  /** DICHIARAZIONE VARIABILI DI RETE**/
+  struct sockaddr_in addr = {0};
 	
-	int logger_pipe[2];
-	ret = pipe(logger_pipe);
-	ERROR_HELPER(ret, "Impossibile creare pipe");
+	server_address = argv[1];
 	
-	/** CREAZIONE FIGLIO LOGGER **/
-  logger_pid = fork();
-  if(logger_pid == -1) ERROR_HELPER(-1, "Errore nella creazione figlio");
-  if(logger_pid == 0){
-		/** SETTO LE FUNZIONI DA ESEGUIRE IN CASO DI SIGQUIT SIGINT SIGTERM **/
-		struct sigaction act;
-		memset(&act, '\0', sizeof(act));
-		
-		act.sa_sigaction = &action_logger;
-		act.sa_flags		 = SA_SIGINFO;
-		
-		ret = sigaction(SIGINT, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGQUIT, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGTERM, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		
-		/** AVVIO DEL LOGGER **/
-		startLogger(logfile_desc, logger_pipe);
-		
-		/** CHIUSURA DEL LOGGER**/
-		exit(EXIT_SUCCESS);		
-	}
-	/** CLIENT CODE **/
-  else{
-		/** CHIUDO DESCRITTORI INUTILI **/
-		close(logfile_desc);
-		close(logger_pipe[0]);
-		
-		/** REDIRIGO STDERR SUL DESCRITTORE DI SCRITTURA **/
-		dup2(logger_pipe[1], STDERR_FILENO);
+	struct sigaction act;
+	memset(&act, '\0', sizeof(act));
+	
+	act.sa_sigaction 	= &action;
+	act.sa_flags			= SA_SIGINFO;
+	
+	ret = sigaction(SIGINT, &act, NULL);
+	ERROR_HELPER(ret, "Errore nella sigaction");
+	ret = sigaction(SIGQUIT, &act, NULL);
+	ERROR_HELPER(ret, "Errore nella sigaction");
+	ret = sigaction(SIGTERM, &act, NULL);
+	ERROR_HELPER(ret, "Errore nella sigaction");
+	ret = sigaction(SIGSEGV, &act, NULL);
+	ERROR_HELPER(ret, "Errore nella sigaction");
+	
+  socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
+	ERROR_HELPER(socket_tcp, "Errore creazione socket");
+	
+  addr.sin_family 			= AF_INET;
+  addr.sin_port 				= htons(SERVER_PORT);
+  addr.sin_addr.s_addr 	= inet_addr(server_address);
   
-		int ret;
-  
-		Image* map_elevation;
-		Image* map_texture;
-		Image* my_texture = Image_load(argv[2]);
-		
-	  /** DICHIARAZIONE VARIABILI DI RETE**/
-	  struct sockaddr_in addr = {0};
-		
-		server_address = argv[1];
-		
-		struct sigaction act;
-		memset(&act, '\0', sizeof(act));
-		
-		act.sa_sigaction 	= &action;
-		act.sa_flags			= SA_SIGINFO;
-		
-		ret = sigaction(SIGINT, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGQUIT, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGTERM, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		ret = sigaction(SIGSEGV, &act, NULL);
-		ERROR_HELPER_LOGGER(ret, "Errore nella sigaction");
-		
-	  socket_tcp = socket(AF_INET, SOCK_STREAM, 0);
-		ERROR_HELPER_LOGGER(socket_tcp, "Errore creazione socket");
-		time(&curr_time);
-		fprintf(stderr, "%s%s Socket creato\n", ctime(&curr_time), CLIENT);
-		
-	  addr.sin_family 			= AF_INET;
-	  addr.sin_port 				= htons(SERVER_PORT);
-	  addr.sin_addr.s_addr 	= inet_addr(server_address);
-	  
-	  /** COUNTDOWN PER CONNETTERSI, DOPO 5 TENTATIVI SMETTE**/
-		int count = 0;
-	  while(count < 5){
-			ret = connect(socket_tcp, (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
-			if(ret > -1) break;
-			count++;
-			sleep(1);
-		}
-		if(count > 4) ERROR_HELPER(ret, "Errore nella connect\n");
-		count ^= count;
-		
-		time(&curr_time);
-		fprintf(stderr, "%s%s Socket connesso via tcp\n", ctime(&curr_time), CLIENT);
-	  /** CONNESSIONE EFFETTUATA -> OTTIMIZZO LA RECV E RICHIEDO VARIABILI VIA TCP**/
-		struct timeval tv;
-		tv.tv_sec = 15;
-		tv.tv_usec= 0;
-		ret = setsockopt(socket_tcp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
-		ERROR_HELPER_LOGGER(ret, "Errore nella setsockopt");
-	  getter_TCP(my_texture, &map_elevation, &map_texture);
-		
-	  /** COSTRUISCO IL MONDO CON LE VARIABILI APPENA OTTENUTA **/
-	  time(&curr_time);
-		fprintf(stderr, "%s%s Costruisco mondo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	  World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
-	  vehicle= (Vehicle*) malloc(sizeof(Vehicle));
-	  Vehicle_init(vehicle, &world, my_id, my_texture);
-	  World_addVehicle(&world, vehicle);
-	  
-	  /** PARTE UDP**/
-	  fprintf(stderr, "%s%sCreazione thread UDP da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	  pthread_t udp_thread;
-	  int socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
-		ERROR_HELPER_LOGGER(ret, "Impossibile creare socket UDP");
-		
-	  struct args* arg = (struct args*) calloc(1, sizeof(struct args));
-	  arg -> idx = my_id;
-		arg -> tcp_sock = socket_tcp;
-		arg -> udp_sock = socket_udp;
-		
-		/**INIZIALIZZO SEMAFORO**/
-		world_sem = (sem_t*) calloc(1, sizeof(sem_t));
-		sem_init(world_sem, 0, 1);
-		
-		request = (sem_t*) calloc(1, sizeof(sem_t));
-		sem_init(request, 0, 1);
-		
-		/** LANCIO THREAD UDP**/
-		shouldUpdate = 1;
-		ret = pthread_create(&udp_thread, NULL, client_udp_routine, arg);  
-	  PTHREAD_ERROR_HELPER(ret, "Errore nella creazioni del thread");
-	  
-	  fprintf(stderr, "%s%sLancio worldviewer da parte di %d\n", ctime(&curr_time), CLIENT, my_id); 
-	  
-	  WorldViewer_runGlobal(&world, vehicle, &argc, argv);
-		
-		ret = pthread_join(udp_thread, NULL);
-		PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
-	  
-	  /** CLIENT DISCONNESSO **/
-	  fprintf(stderr, "%s%sDisconnessione da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-		World_destroy(&world);
-		
-		waitpid(logger_pid, NULL, 0); //ASPETTIAMO CHE IL LOGGER FINISCA
-		close(socket_tcp);
-		close(socket_udp);
-		close(logger_pipe[1]);
-		
-		sem_destroy(world_sem);
-		sem_destroy(request);
-		
-		free(world_sem);
-		free(request);
-		
-		free(arg);
-		
-	  return 0;
+  /** COUNTDOWN PER CONNETTERSI, DOPO 5 TENTATIVI SMETTE**/
+	int count = 0;
+  while(count < 5){
+		ret = connect(socket_tcp, (struct sockaddr*) &addr, sizeof(struct sockaddr_in));
+		if(ret > -1) break;
+		count++;
+		sleep(1);
 	}
+	if(count > 4) ERROR_HELPER(ret, "Errore nella connect\n");
+	count ^= count;
+	
+	time(&curr_time);
+	fprintf(stderr, "%s%s Socket connesso via tcp\n", ctime(&curr_time), CLIENT);
+  /** CONNESSIONE EFFETTUATA -> OTTIMIZZO LA RECV E RICHIEDO VARIABILI VIA TCP**/
+	struct timeval tv;
+	tv.tv_sec = 15;
+	tv.tv_usec= 0;
+	ret = setsockopt(socket_tcp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	ERROR_HELPER(ret, "Errore nella setsockopt");
+	
+	ret = getter_TCP();
+	if(ret == -1){
+		printf("%sERRORE ACQUISIZIONE DATI VIA TCP, ABORT!\n", CLIENT);
+		exit(EXIT_FAILURE);
+	}
+	
+  /** COSTRUISCO IL MONDO CON LE VARIABILI APPENA OTTENUTA **/
+  time(&curr_time);
+	fprintf(stderr, "%s%s Costruisco mondo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+  World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
+  vehicle= (Vehicle*) malloc(sizeof(Vehicle));
+  Vehicle_init(vehicle, &world, my_id, my_texture);
+  World_addVehicle(&world, vehicle);
+  
+  /** PARTE UDP**/
+  fprintf(stderr, "%s%sCreazione thread UDP da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+  pthread_t udp_thread;
+  int socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
+	ERROR_HELPER(ret, "Impossibile creare socket UDP");
+	
+  struct args* arg = (struct args*) calloc(1, sizeof(struct args));
+  arg -> idx = my_id;
+	arg -> tcp_sock = socket_tcp;
+	arg -> udp_sock = socket_udp;
+	
+	/**INIZIALIZZO SEMAFORO**/
+	world_sem = (sem_t*) calloc(1, sizeof(sem_t));
+	sem_init(world_sem, 0, 1);
+	
+	request = (sem_t*) calloc(1, sizeof(sem_t));
+	sem_init(request, 0, 1);
+	
+	/** LANCIO THREAD UDP**/
+	shouldUpdate = 1;
+	ret = pthread_create(&udp_thread, NULL, client_udp_routine, arg);  
+  PTHREAD_ERROR_HELPER(ret, "Errore nella creazioni del thread");
+  
+  ret = pthread_detach(udp_thread);
+	PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
+	
+	fprintf(stderr, "%s%sLancio worldviewer da parte di %d\n", ctime(&curr_time), CLIENT, my_id); 
+  WorldViewer_runGlobal(&world, vehicle, &argc, argv);		
+  return 0;
+
 }

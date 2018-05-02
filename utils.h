@@ -10,6 +10,7 @@
 #define BACKLOG			5
 #define ACTIVE			8
 #define BUFFERSIZE	1000000
+#define BUFF_UDP		1000
 #define MAX_USER 		100
 
 //USED FOR DEBUG
@@ -40,5 +41,6 @@ struct args{ //USED BY A THREAD IN SERVER
 	int tcp_sock;
 	int udp_sock;
 	int idx;
+	int logger_pipe; //PASSATA DAL CLIENT UDP SOLO PER ESSERE CHIUSA, NON VIENE USATA
 };
 
