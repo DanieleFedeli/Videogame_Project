@@ -1,5 +1,3 @@
-#pragma once
-
 #include <GL/gl.h>
 #include <GL/glut.h>
 #include <stdio.h>

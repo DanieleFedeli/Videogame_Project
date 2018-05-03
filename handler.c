@@ -332,7 +332,6 @@ void * server_udp_routine(void* arg){
 			ret = sendto(current->list.socket_udp, SEND, msg_len, 0, &client, (socklen_t) addrlen);		
 			char string[100];
 			sprintf(string, "Errore nella send to id:%d\n", id);
-			ERROR_HELPER(ret, "string");
 		}
 		sem_post(world_sem);
 		

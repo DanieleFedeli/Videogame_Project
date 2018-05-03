@@ -96,15 +96,16 @@ void* getter(void* arg){
 	
 		ret = send(param.tcp_sock, SEND, msg_len, 0);
 		ERROR_HELPER(ret, "Errore nella send");
-		ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, 0);
+		ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, MSG_WAITALL);
 		ERROR_HELPER(ret, "Errore nella receive");
 		
 		time(&curr_time);
 		fprintf(stderr, "%s%sRicevuti %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, ret, my_id);
 		h = *(PacketHeader*)RECEIVE;
 		image_packet = (ImagePacket*)Packet_deserialize(RECEIVE, ret);
-
-		if(h.size > 150000 && ret > 150000 && h.size < 400000) break;
+		
+		if(ret > 0) break;
+		//if(h.size > 150000 && ret > 150000 && h.size < 400000) break;
 		// Molte volte capitava di ricevere texture corrotte, facendo crashare il client
 		// in questo modo si riducono le probabilità al minimo
 	}
@@ -305,7 +306,7 @@ int getter_TCP(void){
 		ERROR_HELPER(ret, "Errore nella send");
 		Packet_free(&id_packet->header);
 		
-		ret = recv(socket_tcp, id_buffer, length, 0);
+		ret = recv(socket_tcp, id_buffer, length, MSG_WAITALL);
 		ERROR_HELPER(ret, "Errore nella recv");
 		
 	  id_packet = (IdPacket*) Packet_deserialize(id_buffer, length);
@@ -372,7 +373,9 @@ int getter_TCP(void){
 		free(image_packet_buffer);
 		
 		image_packet_buffer = (char*)calloc(BUFFERSIZE, sizeof(ImagePacket*));
-		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
+		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, MSG_WAITALL);
+		time(&curr_time);
+		fprintf(stderr, "%s%sBuffer ricevuto di %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, ret, my_id);
 		
 		image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
 		map_elevation = image_packet -> image;
@@ -382,7 +385,7 @@ int getter_TCP(void){
 		time(&curr_time);
 		fprintf(stderr, "%s%sElevation map ricevuta da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, ret);
 		
-		if(map_elevation != NULL && ret > 15000) result = 0;
+		if(map_elevation != NULL) result = 0;
 		else count++;
 	}
 	
@@ -410,12 +413,12 @@ int getter_TCP(void){
 		ERROR_HELPER(ret, "Errore nella send");
 		Packet_free(&image_packet->header);
 	
-		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, 0);
+		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, MSG_WAITALL);
 		ERROR_HELPER(ret, "Errore nella recv");
 		
 		
 		
-		if(ret < 150000){
+		if(ret < 0){
 			count++;
 			continue;
 		}
@@ -430,7 +433,7 @@ int getter_TCP(void){
 		
 		free(id_buffer);
 		
-		if(map_texture != NULL && ret > 150000) result = 0;
+		if(map_texture != NULL) result = 0;
 	}
 	
 	result = 0;
@@ -490,7 +493,7 @@ int main(int argc, char **argv) {
 	fprintf(stderr, "%s%s Socket connesso via tcp\n", ctime(&curr_time), CLIENT);
   /** CONNESSIONE EFFETTUATA -> OTTIMIZZO LA RECV E RICHIEDO VARIABILI VIA TCP**/
 	struct timeval tv;
-	tv.tv_sec = 15;
+	tv.tv_sec = 3;
 	tv.tv_usec= 0;
 	ret = setsockopt(socket_tcp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
 	ERROR_HELPER(ret, "Errore nella setsockopt");
@@ -528,6 +531,8 @@ int main(int argc, char **argv) {
 	sem_init(request, 0, 1);
 	
 	/** LANCIO THREAD UDP**/
+	time(&curr_time);
+	fprintf(stderr, "%s%sLancio routine UDP parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 	shouldUpdate = 1;
 	ret = pthread_create(&udp_thread, NULL, client_udp_routine, arg);  
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazioni del thread");

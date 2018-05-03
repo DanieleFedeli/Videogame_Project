@@ -1,252 +1,162 @@
-Wed May  2 15:45:00 2018
+Thu May  3 13:49:05 2018
 [SERVER] Server startato
-Wed May  2 15:45:00 2018
+Thu May  3 13:49:05 2018
 [SERVER] ...Inizializzazione risorse
-Wed May  2 15:45:00 2018
+Thu May  3 13:49:05 2018
 [SERVER] Risorse inizializzate
-Wed May  2 15:45:00 2018
+Thu May  3 13:49:05 2018
 [SERVER] Start thread listener
-Wed May  2 15:45:03 2018
+Thu May  3 13:49:09 2018
 [SERVER] Connessione accettata. ID: 4
-Wed May  2 15:45:03 2018
+Thu May  3 13:49:09 2018
 [ TCP  ] Inizio ciclo tcp di 4
-Wed May  2 15:45:03 2018
+Thu May  3 13:49:09 2018
 [ TCP  ] Richiesta id ricevuta da 4
-Wed May  2 15:45:03 2018
+Thu May  3 13:49:09 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:03 2018
+Thu May  3 13:49:09 2018
 [ TCP  ] Provo ad inviare 12 bytes da parte di 4
-Wed May  2 15:45:04 2018
+Thu May  3 13:49:10 2018
 [ TCP  ] Richiesta posttexture ricevuta da 4!
-Wed May  2 15:45:04 2018
+Thu May  3 13:49:10 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:04 2018
+Thu May  3 13:49:10 2018
 [ UDP  ] Inizio comunicazione UDP da parte di 4
-Wed May  2 15:45:05 2018
+Thu May  3 13:49:11 2018
 [ TCP  ] Richiesta getelevation ricevuta da 4!
-Wed May  2 15:45:05 2018
+Thu May  3 13:49:11 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:05 2018
+Thu May  3 13:49:11 2018
 [ TCP  ] Provo ad inviare 65575 bytes da parte di 4
-Wed May  2 15:45:06 2018
+Thu May  3 13:49:13 2018
 [SERVER] Connessione accettata. ID: 7
-Wed May  2 15:45:06 2018
+Thu May  3 13:49:13 2018
+[ TCP  ] Inizio ciclo tcp di 7
+Thu May  3 13:49:13 2018
+[ TCP  ] Richiesta id ricevuta da 7
+Thu May  3 13:49:13 2018
+[ TCP  ] Pacchetto analizzato da parte di 7
+Thu May  3 13:49:13 2018
+[ TCP  ] Provo ad inviare 12 bytes da parte di 7
+Thu May  3 13:49:14 2018
+[ TCP  ] Richiesta posttexture ricevuta da 7!
+Thu May  3 13:49:14 2018
+[ TCP  ] Pacchetto analizzato da parte di 7
+Thu May  3 13:49:14 2018
+[ UDP  ] Inizio comunicazione UDP da parte di 7
+Thu May  3 13:49:15 2018
+[ TCP  ] Richiesta getelevation ricevuta da 7!
+Thu May  3 13:49:15 2018
+[ TCP  ] Pacchetto analizzato da parte di 7
+Thu May  3 13:49:15 2018
+[ TCP  ] Provo ad inviare 65575 bytes da parte di 7
+Thu May  3 13:49:16 2018
 [ TCP  ] Richiesta gettexture ricevuta da 4
-Wed May  2 15:45:06 2018
+Thu May  3 13:49:16 2018
 [ TCP  ] Richiesta getsurface ricevuta da 4!
-Wed May  2 15:45:06 2018
+Thu May  3 13:49:16 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:06 2018
+Thu May  3 13:49:16 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 4
-Wed May  2 15:45:06 2018
-[ TCP  ] Inizio ciclo tcp di 7
-Wed May  2 15:45:06 2018
-[ TCP  ] Richiesta id ricevuta da 7
-Wed May  2 15:45:06 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:06 2018
-[ TCP  ] Provo ad inviare 12 bytes da parte di 7
-Wed May  2 15:45:07 2018
-[ TCP  ] Richiesta posttexture ricevuta da 7!
-Wed May  2 15:45:07 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:07 2018
-[ TCP  ] Errore pacchetto da 7!
-Wed May  2 15:45:07 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:07 2018
-[ UDP  ] Inizio comunicazione UDP da parte di 7
-Wed May  2 15:45:07 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Richiesta gettexture ricevuta da 4
-Wed May  2 15:45:07 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Cerco texture di 7!
-Wed May  2 15:45:07 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:07 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 4
-Wed May  2 15:45:08 2018
-[ TCP  ] Richiesta getelevation ricevuta da 7!
-Wed May  2 15:45:08 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:08 2018
-[ TCP  ] Provo ad inviare 65575 bytes da parte di 7
-Wed May  2 15:45:09 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:09 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Richiesta getsurface ricevuta da 7!
-Wed May  2 15:45:09 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:09 2018
+Thu May  3 13:49:19 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:09 2018
+Thu May  3 13:49:23 2018
 [ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:09 2018
-[ TCP  ] Richiesta getsurface ricevuta da 7!
-Wed May  2 15:45:09 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:09 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:09 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:09 2018
-[ TCP  ] Richiesta getsurface ricevuta da 7!
-Wed May  2 15:45:09 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:09 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:11 2018
-[ TCP  ] Ricevuti 0 bytes di 7. Disconnessione.
-Wed May  2 15:45:11 2018
-[ TCP  ] Setto shouldThread a 0 da parte di 7
-Wed May  2 15:45:11 2018
-[ TCP  ] Veicolo 7 eliminato
-Wed May  2 15:45:11 2018
-[ TCP  ] Chiusura thread da parte di 7
-Wed May  2 15:45:11 2018
-[ UDP  ] Comunicazione udp terminata da parte di 7
-Wed May  2 15:45:13 2018
-[SERVER] Connessione accettata. ID: 7
-Wed May  2 15:45:13 2018
-[ TCP  ] Inizio ciclo tcp di 7
-Wed May  2 15:45:13 2018
-[ TCP  ] Richiesta id ricevuta da 7
-Wed May  2 15:45:13 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:13 2018
-[ TCP  ] Provo ad inviare 12 bytes da parte di 7
-Wed May  2 15:45:14 2018
-[ TCP  ] Richiesta posttexture ricevuta da 7!
-Wed May  2 15:45:14 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:14 2018
-[ UDP  ] Inizio comunicazione UDP da parte di 7
-Wed May  2 15:45:15 2018
-[ TCP  ] Richiesta getelevation ricevuta da 7!
-Wed May  2 15:45:15 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:15 2018
-[ TCP  ] Provo ad inviare 65575 bytes da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Richiesta getsurface ricevuta da 7!
-Wed May  2 15:45:16 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:16 2018
+Thu May  3 13:49:23 2018
 [ TCP  ] Cerco texture di 4!
-Wed May  2 15:45:16 2018
+Thu May  3 13:49:23 2018
 [ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:16 2018
+Thu May  3 13:49:23 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Cerco texture di 4!
-Wed May  2 15:45:16 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Cerco texture di 4!
-Wed May  2 15:45:16 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:16 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:21 2018
+Thu May  3 13:49:30 2018
 [SERVER] Connessione accettata. ID: 9
-Wed May  2 15:45:21 2018
+Thu May  3 13:49:30 2018
 [ TCP  ] Inizio ciclo tcp di 9
-Wed May  2 15:45:21 2018
+Thu May  3 13:49:30 2018
 [ TCP  ] Richiesta id ricevuta da 9
-Wed May  2 15:45:21 2018
+Thu May  3 13:49:30 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:21 2018
+Thu May  3 13:49:30 2018
 [ TCP  ] Provo ad inviare 12 bytes da parte di 9
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
 [ TCP  ] Richiesta posttexture ricevuta da 9!
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:22 2018
-[ TCP  ] Errore pacchetto da 9!
-Wed May  2 15:45:22 2018
-[ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:22 2018
-[ TCP  ] Richiesta gettexture ricevuta da 7
-Wed May  2 15:45:22 2018
-[ TCP  ] Cerco texture di 9!
-Wed May  2 15:45:22 2018
-[ TCP  ] Pacchetto analizzato da parte di 7
-Wed May  2 15:45:22 2018
-[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
-Wed May  2 15:45:22 2018
-[ UDP  ] Inizio comunicazione UDP da parte di 9
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
 [ TCP  ] Richiesta gettexture ricevuta da 4
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
 [ TCP  ] Cerco texture di 9!
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
+[ TCP  ] Richiesta gettexture ricevuta da 7
+Thu May  3 13:49:31 2018
+[ TCP  ] Cerco texture di 9!
+Thu May  3 13:49:31 2018
+[ TCP  ] Pacchetto analizzato da parte di 7
+Thu May  3 13:49:31 2018
+[ TCP  ] Provo ad inviare 196647 bytes da parte di 7
+Thu May  3 13:49:31 2018
 [ TCP  ] Pacchetto analizzato da parte di 4
-Wed May  2 15:45:22 2018
+Thu May  3 13:49:31 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 4
-Wed May  2 15:45:23 2018
+Thu May  3 13:49:31 2018
+[ UDP  ] Inizio comunicazione UDP da parte di 9
+Thu May  3 13:49:32 2018
 [ TCP  ] Richiesta getelevation ricevuta da 9!
-Wed May  2 15:45:23 2018
+Thu May  3 13:49:32 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:23 2018
+Thu May  3 13:49:32 2018
 [ TCP  ] Provo ad inviare 65575 bytes da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:37 2018
 [ TCP  ] Richiesta gettexture ricevuta da 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:37 2018
 [ TCP  ] Richiesta getsurface ricevuta da 9!
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:37 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:37 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:40 2018
 [ TCP  ] Richiesta gettexture ricevuta da 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:40 2018
 [ TCP  ] Cerco texture di 4!
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:40 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:40 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:43 2018
 [ TCP  ] Richiesta gettexture ricevuta da 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:43 2018
 [ TCP  ] Cerco texture di 7!
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:43 2018
 [ TCP  ] Pacchetto analizzato da parte di 9
-Wed May  2 15:45:24 2018
+Thu May  3 13:49:43 2018
 [ TCP  ] Provo ad inviare 196647 bytes da parte di 9
-Wed May  2 15:45:44 2018
+Thu May  3 13:50:00 2018
 [ TCP  ] Ricevuti 0 bytes di 9. Disconnessione.
-Wed May  2 15:45:44 2018
+Thu May  3 13:50:00 2018
 [ TCP  ] Setto shouldThread a 0 da parte di 9
-Wed May  2 15:45:44 2018
-[ TCP  ] Veicolo 9 eliminato
-Wed May  2 15:45:44 2018
+Thu May  3 13:50:00 2018
 [ UDP  ] Comunicazione udp terminata da parte di 9
-Wed May  2 15:45:44 2018
+Thu May  3 13:50:00 2018
+[ TCP  ] Veicolo 9 eliminato
+Thu May  3 13:50:00 2018
 [ TCP  ] Chiusura thread da parte di 9
-Wed May  2 15:45:59 2018
-[ TCP  ] Ricevuti -1 bytes di 7. Disconnessione.
-Wed May  2 15:45:59 2018
-[ TCP  ] Setto shouldThread a 0 da parte di 7
-Wed May  2 15:45:59 2018
-[ UDP  ] Condizione nulla nel packet handler udp di 7
-Wed May  2 15:45:59 2018
-[ UDP  ] Comunicazione udp terminata da parte di 7
-Wed May  2 15:45:59 2018
-[ TCP  ] Veicolo 7 eliminato
-Wed May  2 15:45:59 2018
-[ TCP  ] Chiusura thread da parte di 7
-Wed May  2 15:46:11 2018
+Thu May  3 13:50:01 2018
 [ TCP  ] Ricevuti 0 bytes di 4. Disconnessione.
-Wed May  2 15:46:11 2018
+Thu May  3 13:50:01 2018
 [ TCP  ] Setto shouldThread a 0 da parte di 4
+Thu May  3 13:50:02 2018
+[ TCP  ] Ricevuti 0 bytes di 7. Disconnessione.
