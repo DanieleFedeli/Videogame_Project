@@ -48,7 +48,6 @@ void action(int sig, siginfo_t *siginfo, void* context){
 			free(request);
 			World_destroy(&world);
 
-			
 			exit(0);
 		}
 		
@@ -56,7 +55,7 @@ void action(int sig, siginfo_t *siginfo, void* context){
 		{
 			printf("%sSEGMENTATION\n", CLIENT);
 			shouldUpdate = 0;
-			sleep(2);
+			sleep(1);
 			
 			close(socket_tcp);
 			close(socket_udp);
@@ -66,8 +65,6 @@ void action(int sig, siginfo_t *siginfo, void* context){
 			free(request);
 			World_destroy(&world);
 			
-			//Image_free(map_elevation);
-			//Image_free(map_texture);			
 			exit(0);
 		}
 		
@@ -85,36 +82,54 @@ void* getter(void* arg){
 	ImagePacket* image_packet;
 	
 	/** CICLO DI ACQUISIZIONE TEXTURE **/
-	while(1){
-		image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
-		PacketHeader h;
-		h.type = GetTexture;
-		image_packet->header = h;
-		image_packet->id = param.idx;
-		image_packet->image = calloc(1, sizeof(Image));
-		msg_len = Packet_serialize(SEND, &image_packet->header);
+	image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
+	PacketHeader h;
+	h.type = GetTexture;
+	image_packet->header = h;
+	image_packet->id = param.idx;
+	image_packet->image = calloc(1, sizeof(Image));
+	msg_len = Packet_serialize(SEND, &image_packet->header);
+		
+	ret = send(param.tcp_sock, SEND, msg_len, 0);
+	ERROR_HELPER(ret, "Errore nella send");
+		
+	int data_recv;
+	data_recv = recv(socket_tcp, RECEIVE, sizeof(PacketHeader), 0);
+	h = *(PacketHeader*)RECEIVE;
 	
-		ret = send(param.tcp_sock, SEND, msg_len, 0);
-		ERROR_HELPER(ret, "Errore nella send");
-		ret = recv(param.tcp_sock, RECEIVE, BUFFERSIZE, MSG_WAITALL);
-		ERROR_HELPER(ret, "Errore nella receive");
+	time(&curr_time);	
+	if(DEBUG)fprintf(stderr, "%s%sRicevuti %d bytes di header da parte di %d\n", ctime(&curr_time), CLIENT, data_recv, my_id);
 		
-		time(&curr_time);
-		fprintf(stderr, "%s%sRicevuti %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, ret, my_id);
-		h = *(PacketHeader*)RECEIVE;
-		image_packet = (ImagePacket*)Packet_deserialize(RECEIVE, ret);
-		
-		if(ret > 0) break;
-		//if(h.size > 150000 && ret > 150000 && h.size < 400000) break;
-		// Molte volte capitava di ricevere texture corrotte, facendo crashare il client
-		// in questo modo si riducono le probabilità al minimo
+	while(data_recv < h.size){
+		ret = recv(socket_tcp, RECEIVE + data_recv, h.size - data_recv, 0);
+				
+		if(ret < 1) ERROR_HELPER(ret, "ERRORE RECV");
+				
+		data_recv += ret;
 	}
+		
+	ERROR_HELPER(ret, "Errore nella receive");
+		
+	time(&curr_time);
+	if(DEBUG)fprintf(stderr, "%s%sRicevuti %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, data_recv, my_id);
+	image_packet = (ImagePacket*)Packet_deserialize(RECEIVE, h.size);
 	
-	/**CICLO FINITO -> AGGIUNGO USER **/
+	/**AGGIUNGO USER **/
 	sem_wait(world_sem);
 	time(&curr_time);
-	fprintf(stderr, "%s%sAggiungo user cond id %d da parte di %d\n", ctime(&curr_time), CLIENT, param.idx, my_id);
-	Vehicle_init(toAdd, &world, param.idx, image_packet->image);
+	if(DEBUG)fprintf(stderr, "%s%sAggiungo user cond id %d da parte di %d\n", ctime(&curr_time), CLIENT, param.idx, my_id);
+	Image* texture_vehicle = image_packet->image;
+	if(DEBUG){
+		char toPut[BUFFERSIZE];
+		int size = Image_serialize(texture_vehicle, toPut, 1024*1024);
+		time(&curr_time);
+		fprintf(stderr, "%s%sDimensione texture: %d\n", ctime(&curr_time), CLIENT, size);
+		char filename[BUFFERSIZE];
+		sprintf(filename, "images/vehicle_img_client_%d_from_%d", my_id, param.idx);
+		Image_save(texture_vehicle, filename);
+	}
+	
+	Vehicle_init(toAdd, &world, param.idx, texture_vehicle);
 	
 	World_addVehicle(&world, toAdd);
 	sem_post(world_sem);
@@ -141,7 +156,7 @@ int packet_handler_udp(char* PACKET, char* SEND){
 			if(v == NULL){ //Se il veicolo è null, aggiungilo al world
 				/** VEICOLO NON TROVATO NEL WORLD, LANCIO LA ROUTINE GETTER**/
 				time(&curr_time);
-				fprintf(stderr, "%s%sCreo thread per aggiungere veicolo %d da parte di %d\n", ctime(&curr_time), CLIENT, wup->updates[i].id, my_id);
+				if(DEBUG)fprintf(stderr, "%s%sCreo thread per aggiungere veicolo %d da parte di %d\n", ctime(&curr_time), CLIENT, wup->updates[i].id, my_id);
 				pthread_t get;
 				param = (struct args*) calloc(1, sizeof(struct args));
 				param->idx = wup->updates[i].id;
@@ -151,7 +166,7 @@ int packet_handler_udp(char* PACKET, char* SEND){
 				
 				ret = pthread_join(get, NULL);
 				time(&curr_time);
-				fprintf(stderr, "%s%sThread concluso da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+				if(DEBUG)fprintf(stderr, "%s%sThread concluso da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 				PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
 				
 			}
@@ -173,7 +188,7 @@ int packet_handler_udp(char* PACKET, char* SEND){
 		
 		/** ROUTINE PER RICERCARE IL VEICOLO INATTIVO ED ELIMINARLO**/
 		time(&curr_time);
-		fprintf(stderr, "%s%sAlla ricerca di un veicolo inattivo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		if(DEBUG)fprintf(stderr, "%s%sAlla ricerca di un veicolo inattivo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 		sem_wait(world_sem);
 		Vehicle* current = (Vehicle*) world.vehicles.first;
 		
@@ -193,7 +208,7 @@ int packet_handler_udp(char* PACKET, char* SEND){
 			
 			if(!in){
 				time(&curr_time);
-				fprintf(stderr, "%s%sElimino veicolo %d da parte di %d\n", ctime(&curr_time), CLIENT, current->id, my_id);
+				if(DEBUG)fprintf(stderr, "%s%sElimino veicolo %d da parte di %d\n", ctime(&curr_time), CLIENT, current->id, my_id);
 				Vehicle* toDelete = current;
 				World_detachVehicle(&world, toDelete);
 				current = (Vehicle*) current->list.next;
@@ -255,7 +270,7 @@ void* client_udp_routine(void* arg){
 		ret = recvfrom(socket_udp, RECEIVE, BUFF_UDP, 0,(struct sockaddr*) &addr, (socklen_t*) &length);
 		if(ret == -1){
 			time(&curr_time);
-			fprintf(stderr, "%s%sDISCONNESSIONE PER TIMEOUT da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+			if(DEBUG)fprintf(stderr, "%s%sDISCONNESSIONE PER TIMEOUT da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 			shouldUpdate = 0;
 		}
 		
@@ -270,12 +285,12 @@ void* client_udp_routine(void* arg){
 	
 	/** CLIENT DISCONNESSO **/
 	time(&curr_time);
-	fprintf(stderr, "%s%sDisconnessione da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	if(DEBUG)fprintf(stderr, "%s%sDisconnessione da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 	
 	close(param->logger_pipe);
 	free(arg);
 	
-	pthread_exit(NULL);
+	exit(EXIT_SUCCESS);
 }
 
 /** FUNZIONE USATA APPENA IL CLIENT SI CONNETTE VIA TCP PER RICHIEDERE TEXTURE **/
@@ -283,37 +298,49 @@ int getter_TCP(void){
 	//VIENE USATA SLEEP(1) ALLA FINE DI OGNI RICHIESTA AL FINE DI NON FAR ACCAVALLARE
 	//LE RICHIESTA AL CLIENT
 	
-  char* id_buffer 					= (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONI DI ID
-  char* image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char)); //USATO PER TRANSAZIONE DI IMG
+  char id_buffer[BUFFERSIZE];
+  char image_packet_buffer[BUFFERSIZE];
+  
   int ret, length, result = 1, count = 0;
   PacketHeader header, im_head;
+  
+  memset(&id_buffer, '\0', BUFFERSIZE);
+  memset(&image_packet_buffer, '\0', BUFFERSIZE);
   
   while(result && count < 5){
   /** ID PART**/
 	  time(&curr_time);
-	  fprintf(stderr, "%s%sPreparazione richista ID da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	  IdPacket* id_packet = (IdPacket*)calloc(1, sizeof(IdPacket));
+	  if(DEBUG)fprintf(stderr, "%s%sPreparazione richista ID da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	  IdPacket id_packet;
 	
-	  header.type   			= GetId;
-	  id_packet -> header = header;
-	  id_packet -> id     = -1;
+	  header.type   	 = GetId;
+	  id_packet.header = header;
+	  id_packet.id     = -1;
 		
-	  length = Packet_serialize(id_buffer, &id_packet->header);
+	  length = Packet_serialize(id_buffer, &id_packet.header);
 	  time(&curr_time);
-	  fprintf(stderr, "%s%sBytes scritti nel buffer %d da parte di %d\n", ctime(&curr_time), CLIENT, length, my_id);
+	  if(DEBUG)fprintf(stderr, "%s%sBytes scritti nel buffer %d da parte di %d\n", ctime(&curr_time), CLIENT, length, my_id);
 		
 		ret = send(socket_tcp, id_buffer, length, 0);
 		ERROR_HELPER(ret, "Errore nella send");
-		Packet_free(&id_packet->header);
 		
-		ret = recv(socket_tcp, id_buffer, length, MSG_WAITALL);
-		ERROR_HELPER(ret, "Errore nella recv");
+		int data_recv;
+		data_recv = recv(socket_tcp, id_buffer, sizeof(PacketHeader), 0);
+		time(&curr_time);
 		
-	  id_packet = (IdPacket*) Packet_deserialize(id_buffer, length);
-	  my_id = id_packet -> id;
+		PacketHeader* h = (PacketHeader*)id_buffer;
+		while(data_recv < h->size){
+				ret = recv(socket_tcp, id_buffer + data_recv, h->size - data_recv, 0);
+				
+				if(ret < 1) ERROR_HELPER(ret, "ERRORE RECV");
+				
+				data_recv += ret;
+		}
+		
+	  id_packet = *(IdPacket*)Packet_deserialize(id_buffer, h->size);
+	  my_id = id_packet.id;
 	  time(&curr_time);
-	  fprintf(stderr, "%s%sID trovato da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	  Packet_free(&id_packet->header);
+	  if(DEBUG)fprintf(stderr, "%s%sID trovato da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 	  
 	  if(my_id > 0) result = 0;
 	  else count++;
@@ -322,27 +349,37 @@ int getter_TCP(void){
 	result = 1;
 	if(count >= 5) return -1;
 	count ^= count;
-	sleep(1); //SLEEP DOPO OGNI RICHIESTA PER NON FAR ACCAVALLARE LE RICHIESTE
 	
-
 	/** POST TEXTURE **/
 	while(result && count < 5){
 		time(&curr_time);
-		fprintf(stderr, "%s%sPreparazione alla richiesta PostTexture da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-	  ImagePacket* image_packet = (ImagePacket*)calloc(1, sizeof(ImagePacket));
+		if(DEBUG)fprintf(stderr, "%s%sPreparazione alla richiesta PostTexture da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	  ImagePacket image_packet;
 	  im_head.type = PostTexture;
+	  im_head.size = 0;
 		
-		image_packet->id		= my_id;
-	  image_packet->header= im_head;
-	  image_packet->image = my_texture;
+		image_packet.id			= my_id;
+	  image_packet.header	= im_head;
+	  image_packet.image 	= my_texture;
 		
-	  length = Packet_serialize(image_packet_buffer, &image_packet->header);
+		
+	  length = Packet_serialize(image_packet_buffer, &image_packet.header);
+	  if(DEBUG)fprintf(stderr, "%s%sOriginal length %d\n", ctime(&curr_time), CLIENT, length);
+		
+		int data_sent = 0;
+		while(data_sent < length){
+			ret = send(socket_tcp, image_packet_buffer + data_sent, length - data_sent, 0);
 			
-		ret = send(socket_tcp, image_packet_buffer, length, 0);
+			if(ret == 0 || ret == -1) ERROR_HELPER(ret, "ERRORE send");
+			
+			data_sent += ret;
+			
+			if(DEBUG)printf("%s%sInviati %d bytes totali\n", ctime(&curr_time), CLIENT, data_sent);
+		}
+		
 		time(&curr_time);
-		fprintf(stderr, "%s%sRichiesta inviata da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-		Packet_free(&image_packet->header);
-		free(image_packet_buffer);
+		if(DEBUG)fprintf(stderr, "%s%sRichiesta inviata: %d bytes inviati da parte di %d\n", ctime(&curr_time), CLIENT, data_sent, my_id);
+		memset(&image_packet_buffer, '\0', BUFFERSIZE);
 		
 		if(ret == length) result = 0;
 		else count++;
@@ -352,38 +389,40 @@ int getter_TCP(void){
 	if(count >=5 ) return -1;
 	count ^= count;
 	
-	sleep(1);
-	
 	/** ELEVATION MAP **/
 	while(result && count < 5){
 		time(&curr_time);
-		fprintf(stderr, "%s%sPreparazione alla richiesta elevation map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-		image_packet_buffer = (char*) calloc(BUFFERSIZE, sizeof(char));
-		ImagePacket* image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		if(DEBUG)fprintf(stderr, "%s%sPreparazione alla richiesta elevation map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		memset(&image_packet_buffer, '\0', BUFFERSIZE);
+		ImagePacket image_packet;
 		
 	  im_head.type = GetElevation;
-	
-	  image_packet -> header = im_head;
-	  image_packet -> image = NULL;
+		image_packet.header = im_head;
 	  
-	  length = Packet_serialize(image_packet_buffer, &image_packet->header);
-		
+	  length = Packet_serialize(image_packet_buffer, &image_packet.header);
 		ret = send(socket_tcp, image_packet_buffer,length, 0);
-		Packet_free(&image_packet->header);
-		free(image_packet_buffer);
 		
-		image_packet_buffer = (char*)calloc(BUFFERSIZE, sizeof(ImagePacket*));
-		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, MSG_WAITALL);
+		int data_recv;
+		memset(&image_packet_buffer, '\0', BUFFERSIZE);
+		data_recv = recv(socket_tcp, image_packet_buffer, sizeof(PacketHeader), 0);
 		time(&curr_time);
-		fprintf(stderr, "%s%sBuffer ricevuto di %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, ret, my_id);
 		
-		image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
-		map_elevation = image_packet -> image;
-		Packet_free(&image_packet->header);
-		free(image_packet_buffer);
+		PacketHeader* h = (PacketHeader*)image_packet_buffer;
+		while(data_recv < h->size){
+				ret = recv(socket_tcp, image_packet_buffer + data_recv, h->size - data_recv, 0);
+				
+				if(ret < 1) ERROR_HELPER(ret, "ERRORE RECV");
+				
+				data_recv += ret;
+		}
+		
+		if(DEBUG)fprintf(stderr, "%s%sBuffer ricevuto di %d bytes da parte di %d\n", ctime(&curr_time), CLIENT, data_recv, my_id);
+		
+		image_packet = *(ImagePacket*) Packet_deserialize(image_packet_buffer, h->size);
+		map_elevation = image_packet.image;
 		
 		time(&curr_time);
-		fprintf(stderr, "%s%sElevation map ricevuta da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, ret);
+		if(DEBUG)fprintf(stderr, "%s%sElevation map ricevuta da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, data_recv);
 		
 		if(map_elevation != NULL) result = 0;
 		else count++;
@@ -393,46 +432,42 @@ int getter_TCP(void){
 	if(count >= 5) return -1;
 	count ^= count;
 	
-	sleep(1);
-	
 	/**SURFACE MAP **/
 	while(result && count < 5){
 		time(&curr_time);
-		fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
-		image_packet_buffer = (char *) calloc(BUFFERSIZE, sizeof(char));
-		ImagePacket* image_packet = (ImagePacket*) calloc(1, sizeof(ImagePacket));
+		if(DEBUG)fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+		memset(&image_packet_buffer, '\0', BUFFERSIZE);
+		ImagePacket image_packet;
 		
 		im_head.type = GetTexture;
 		
-		image_packet -> header = im_head;
-		image_packet -> id = 0;
+		image_packet.header = im_head;
+		image_packet.id = 0;
 		
-		length = Packet_serialize(image_packet_buffer, &image_packet->header);
+		length = Packet_serialize(image_packet_buffer, &image_packet.header);
 	
 		ret = send(socket_tcp, image_packet_buffer, length, 0);
 		ERROR_HELPER(ret, "Errore nella send");
-		Packet_free(&image_packet->header);
-	
-		ret = recv(socket_tcp, image_packet_buffer, BUFFERSIZE, MSG_WAITALL);
-		ERROR_HELPER(ret, "Errore nella recv");
+
+		int data_recv;
+		memset(&image_packet_buffer, '\0', BUFFERSIZE);
+		data_recv = recv(socket_tcp, image_packet_buffer, sizeof(PacketHeader), 0);
+		time(&curr_time);
 		
-		
-		
-		if(ret < 0){
-			count++;
-			continue;
+		PacketHeader* h = (PacketHeader*)image_packet_buffer;
+		while(data_recv < h->size){
+				ret = recv(socket_tcp, image_packet_buffer + data_recv, h->size - data_recv, 0);
+				
+				if(ret < 1) ERROR_HELPER(ret, "ERRORE RECV");
+				
+				data_recv += ret;
 		}
 		
-		image_packet = (ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
-		map_texture = image_packet -> image;
-		free(image_packet_buffer);
-		Packet_free(&image_packet->header);
+		image_packet = *(ImagePacket*) Packet_deserialize(image_packet_buffer, ret);
+		map_texture = image_packet.image;
 		
 		time(&curr_time);
-		fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, ret);
-		
-		free(id_buffer);
-		
+		if(DEBUG)fprintf(stderr, "%s%sPreparazione alla richiesta surface map da parte di %d size: %d bytes\n", ctime(&curr_time), CLIENT, my_id, data_recv);
 		if(map_texture != NULL) result = 0;
 	}
 	
@@ -450,6 +485,7 @@ int main(int argc, char **argv) {
 
 	int ret;
 	my_texture = Image_load(argv[2]);
+	
 	
   /** DICHIARAZIONE VARIABILI DI RETE**/
   struct sockaddr_in addr = {0};
@@ -490,33 +526,44 @@ int main(int argc, char **argv) {
 	count ^= count;
 	
 	time(&curr_time);
-	fprintf(stderr, "%s%s Socket connesso via tcp\n", ctime(&curr_time), CLIENT);
+	if(DEBUG)fprintf(stderr, "%s%s Socket connesso via tcp\n", ctime(&curr_time), CLIENT);
   /** CONNESSIONE EFFETTUATA -> OTTIMIZZO LA RECV E RICHIEDO VARIABILI VIA TCP**/
 	struct timeval tv;
-	tv.tv_sec = 3;
+	tv.tv_sec = 10;
 	tv.tv_usec= 0;
 	ret = setsockopt(socket_tcp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
 	ERROR_HELPER(ret, "Errore nella setsockopt");
 	
 	ret = getter_TCP();
 	if(ret == -1){
-		printf("%sERRORE ACQUISIZIONE DATI VIA TCP, ABORT!\n", CLIENT);
+		if(DEBUG)printf("%sERRORE ACQUISIZIONE DATI VIA TCP, ABORT!\n", CLIENT);
 		exit(EXIT_FAILURE);
+	}
+	
+	if(DEBUG){
+				//TROVERÒ QUESTO PROBLEMA INFAME
+				char filename[BUFFERSIZE];
+				sprintf(filename, "images/vehicle_img_client_%d", my_id);
+				Image_save(my_texture, filename);
 	}
 	
   /** COSTRUISCO IL MONDO CON LE VARIABILI APPENA OTTENUTA **/
   time(&curr_time);
-	fprintf(stderr, "%s%s Costruisco mondo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	if(DEBUG)fprintf(stderr, "%s%s Costruisco mondo da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
   World_init(&world, map_elevation, map_texture, 0.5, 0.5, 0.5);
   vehicle= (Vehicle*) malloc(sizeof(Vehicle));
   Vehicle_init(vehicle, &world, my_id, my_texture);
   World_addVehicle(&world, vehicle);
   
   /** PARTE UDP**/
-  fprintf(stderr, "%s%sCreazione thread UDP da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+  if(DEBUG)fprintf(stderr, "%s%sCreazione thread UDP da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
   pthread_t udp_thread;
   int socket_udp = socket(AF_INET, SOCK_DGRAM, 0);
 	ERROR_HELPER(ret, "Impossibile creare socket UDP");
+	tv.tv_sec = 15;
+	tv.tv_usec= 0;
+	ret = setsockopt(socket_udp, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	ERROR_HELPER(ret, "Errore nella setsockopt");
 	
   struct args* arg = (struct args*) calloc(1, sizeof(struct args));
   arg -> idx = my_id;
@@ -532,7 +579,7 @@ int main(int argc, char **argv) {
 	
 	/** LANCIO THREAD UDP**/
 	time(&curr_time);
-	fprintf(stderr, "%s%sLancio routine UDP parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+	if(DEBUG)fprintf(stderr, "%s%sLancio routine UDP parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 	shouldUpdate = 1;
 	ret = pthread_create(&udp_thread, NULL, client_udp_routine, arg);  
   PTHREAD_ERROR_HELPER(ret, "Errore nella creazioni del thread");
@@ -540,7 +587,7 @@ int main(int argc, char **argv) {
   ret = pthread_detach(udp_thread);
 	PTHREAD_ERROR_HELPER(ret, "Errore nella detach");
 	
-	fprintf(stderr, "%s%sLancio worldviewer da parte di %d\n", ctime(&curr_time), CLIENT, my_id); 
+	if(DEBUG)fprintf(stderr, "%s%sLancio worldviewer da parte di %d\n", ctime(&curr_time), CLIENT, my_id); 
   WorldViewer_runGlobal(&world, vehicle, &argc, argv);		
   return 0;
 

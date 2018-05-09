@@ -8,8 +8,7 @@
 #define SERVER_IP 	"127.0.0.1"
 #define SERVER_PORT 8080
 #define BACKLOG			5
-#define ACTIVE			8
-#define BUFFERSIZE	1000000
+#define BUFFERSIZE	2621830
 #define BUFF_UDP		1000
 #define MAX_USER 		100
 
@@ -22,7 +21,7 @@
 #define VEHICLE_FILENAME   "./images/arrow-right.ppm"
 #define SURFACE_FILENAME   "./images/maze.ppm"
 
-#define DEBUG	1
+#define DEBUG	0
 
 //MACRO PER LA GESTIONE DEGLI ERRORI
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \

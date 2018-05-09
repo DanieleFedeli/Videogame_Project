@@ -104,6 +104,7 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 		toSend.header= head;
 
 		msg_len = Packet_serialize(SEND, &toSend.header);
+		sem_post(UDPEXEC);
 		return msg_len;
 	}
 
@@ -114,9 +115,9 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 		PacketHeader head;
 
 		head.type			= PostElevation;
-		toSend.image = elevation;
-		toSend.id		= 0;
-		toSend.header= head;
+		toSend.image 	= elevation;
+		toSend.id			= 0;
+		toSend.header	= head;
 		
 		msg_len = Packet_serialize(SEND, &toSend.header);
 		return msg_len;
@@ -127,12 +128,12 @@ int server_tcp_packet_handler(char* PACKET, char* SEND, Vehicle* v, int id, Imag
 		fprintf(stderr, "%s%sRichiesta posttexture ricevuta da %d!\n", ctime(&curr_time), TCP, id);
 		ImagePacket img_packet = *(ImagePacket*)Packet_deserialize(PACKET, header.size);
 		sem_wait(world_sem);
+		
 		Vehicle_init(v, &w, id, img_packet.image);
 		World_addVehicle(&w, v);
-		sem_post(UDPEXEC);
 		sem_post(world_sem);
 		
-		SEND = memset((void*) PACKET, 0, BUFFERSIZE);
+		//SEND = memset((void*) PACKET, 0, BUFFERSIZE);
 		return 0;
 	}
 	
@@ -184,29 +185,32 @@ void * server_tcp_routine(void* arg){
 	int count = 0;
 	char SEND[BUFFERSIZE], RECEIVE[BUFFERSIZE] = {'\0'};
 	
-	memset((void*) &SEND, '\0', BUFFERSIZE);
-	//memset((void*) &RECEIVE, '\0', BUFFERSIZE);
-	
 	/** QUESTO CICLO SERVE PER LEGGERE COSA VUOLE IL CLIENT, PROCESSARE LA RISPOSTA ED INVIARLA **/
 	time(&curr_time);
 	fprintf(stderr, "%s%sInizio ciclo tcp di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 	while(shouldCommunicate && shouldThread[tcpArg.idx] && count < 5){
 		bytes_read = 0;
 		/** RICEVO DAL SOCKET**/
-		bytes_read = recv(socket, RECEIVE, BUFFERSIZE, MSG_NOSIGNAL);
-
-		if(bytes_read == 0){
+		bytes_read = recv(socket, RECEIVE, sizeof(PacketHeader), 0);
+		fprintf(stderr, "%s%sRicevuto header di %d bytes da parte di %d\n", ctime(&curr_time), TCP, bytes_read,tcpArg.idx);		
+		
+		if(bytes_read < 1){
 			time(&curr_time);
 			fprintf(stderr, "%s%sRicevuti %d bytes di %d. Disconnessione.\n", ctime(&curr_time), TCP, bytes_read, tcpArg.idx);
 			break;
 		}
 		
-		if(bytes_read == -1){
-			time(&curr_time);
-			fprintf(stderr, "%s%sRicevuti %d bytes di %d. Disconnessione.\n", ctime(&curr_time), TCP, bytes_read, tcpArg.idx);
-			break;
+		PacketHeader* h = (PacketHeader*)RECEIVE;
+		int ret; 
+		while(bytes_read < h->size){
+			ret = recv(socket,RECEIVE+bytes_read, h->size - bytes_read, 0);
+			
+			if(ret == 0 || ret == -1) ERROR_HELPER(ret, "ERRORE recv");
+			
+			bytes_read += ret;
 		}
-				
+		
+		fprintf(stderr, "%s%sRicevuti %d bytes da parte di %d\n", ctime(&curr_time), TCP, bytes_read,tcpArg.idx);		
 		/** CHIAMO UN HANDLER PER GENERARE LA RISPOSTA**/
 		msg_len = server_tcp_packet_handler(RECEIVE, SEND, v, tcpArg.idx, &texture, &tcpArg);
 		time(&curr_time);
@@ -223,7 +227,6 @@ void * server_tcp_routine(void* arg){
 			fprintf(stderr, "%s%sTIMEOUT da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
 			break;
 		}
-		time(&curr_time);
 	}
 	
 	sem_wait(thread_sem);	
@@ -285,6 +288,14 @@ void * server_udp_routine(void* arg){
 	time(&curr_time);
 	fprintf(stderr, "%s%sInizio comunicazione UDP da parte di %d\n", ctime(&curr_time), UDP, param.idx);
 	
+	if(DEBUG){
+				//TROVERÒ QUESTO PROBLEMA INFAME
+		printf("Salvo immagine...\n");
+		char filename[BUFFERSIZE];
+		sprintf(filename, "images/vehicle_img_server_%d", id);
+		Image_save(v->texture, filename);
+	}
+		
 	while(shouldThread[id] && shouldCommunicate){	
 		addrlen = sizeof(struct sockaddr);
 		ret = recvfrom(socket_udp, RECEIVE, BUFF_UDP, 0, &client, (socklen_t*) &addrlen);
@@ -338,9 +349,7 @@ void * server_udp_routine(void* arg){
 		//DEALLOCO RISORSE
 		Packet_free(&wup->header);
 		time(&curr_time);
-		//usleep(10000);
 	}
-	
 	sem_post(cancelThread);
 	
 	close(socket_udp);
@@ -349,6 +358,7 @@ void * server_udp_routine(void* arg){
 	sem_wait(thread_sem);	
 	shouldThread[id] = 0;
 	sem_post(thread_sem);	
+	
 	
 	pthread_exit(NULL);
 }
@@ -381,7 +391,8 @@ void print_all_user(){
 
 void quit_server(){
 	if(shouldCommunicate) shouldCommunicate = 0;
-	sleep(3);
+	
+	sleep(1);
 	
 	World_destroy(&w);
 	Image_free(surface);

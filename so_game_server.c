@@ -48,7 +48,7 @@ void action(int sig, siginfo_t *siginfo, void* context){
 }
 
 void action_logger(int sig, siginfo_t *siginfo, void* context){
-	sleep(3);
+	
 	logger_shouldStop = 1;
 }
 
