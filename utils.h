@@ -22,6 +22,7 @@
 #define SURFACE_FILENAME   "./images/maze.ppm"
 
 #define DEBUG	0
+#define OFFLINE 0
 
 //MACRO PER LA GESTIONE DEGLI ERRORI
 #define GENERIC_ERROR_HELPER(cond, errCode, msg) do {               \

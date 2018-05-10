@@ -290,7 +290,11 @@ void* client_udp_routine(void* arg){
 	close(param->logger_pipe);
 	free(arg);
 	
-	exit(EXIT_SUCCESS);
+	if(!OFFLINE){
+		exit(EXIT_SUCCESS);
+	}
+	
+	
 }
 
 /** FUNZIONE USATA APPENA IL CLIENT SI CONNETTE VIA TCP PER RICHIEDERE TEXTURE **/
