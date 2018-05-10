@@ -228,7 +228,7 @@ void * server_tcp_routine(void* arg){
 			break;
 		}
 	}
-	
+
 	sem_wait(thread_sem);	
 	time(&curr_time);
 	fprintf(stderr, "%s%sSetto shouldThread a 0 da parte di %d\n", ctime(&curr_time), TCP, tcpArg.idx);
@@ -263,7 +263,7 @@ void * server_udp_routine(void* arg){
 	int reuseaddr_opt = 1;
 	
 	struct timeval tv;
-	tv.tv_sec 	= 15;
+	tv.tv_sec 	= 7;
 	tv.tv_usec 	= 0;
 	
 	ret = setsockopt(socket_udp, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
@@ -306,7 +306,6 @@ void * server_udp_routine(void* arg){
 		}
 		
 		server_udp_packet_handler(RECEIVE,&param);
-		if(!shouldThread[id] || !shouldCommunicate) break;
 		sem_wait(world_sem);
 		v->addr = client;
 		sem_post(world_sem);
@@ -318,7 +317,8 @@ void * server_udp_routine(void* arg){
 		header.type = WorldUpdate;
 		wup->header = header;
 		
-		sem_wait(world_sem);	
+		if(!shouldThread[id])	break;
+		sem_wait(world_sem);
 		wup->num_vehicles = w.vehicles.size;
 		wup->updates = (ClientUpdate*) calloc(wup->num_vehicles, sizeof(ClientUpdate));
 		Vehicle* current = (Vehicle*) w.vehicles.first;
@@ -340,7 +340,7 @@ void * server_udp_routine(void* arg){
 		if(shouldThread[id] || shouldCommunicate){
 			current = (Vehicle*) World_getVehicle(&w, id);	
 			addrlen = sizeof(struct sockaddr);
-			ret = sendto(current->list.socket_udp, SEND, msg_len, 0, &client, (socklen_t) addrlen);		
+			ret = sendto(current->list.socket_udp, SEND, msg_len, MSG_DONTWAIT, &client, (socklen_t) addrlen);		
 			char string[100];
 			sprintf(string, "Errore nella send to id:%d\n", id);
 		}
@@ -350,6 +350,7 @@ void * server_udp_routine(void* arg){
 		Packet_free(&wup->header);
 		time(&curr_time);
 	}
+
 	sem_post(cancelThread);
 	
 	close(socket_udp);
@@ -392,7 +393,8 @@ void print_all_user(){
 void quit_server(){
 	if(shouldCommunicate) shouldCommunicate = 0;
 	
-	sleep(1);
+	printf("%sQuitting server....\n", SERVER);
+	sleep(2);
 	
 	World_destroy(&w);
 	Image_free(surface);

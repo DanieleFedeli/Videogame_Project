@@ -270,7 +270,7 @@ void* client_udp_routine(void* arg){
 		ret = recvfrom(socket_udp, RECEIVE, BUFF_UDP, 0,(struct sockaddr*) &addr, (socklen_t*) &length);
 		if(ret == -1){
 			time(&curr_time);
-			if(DEBUG)fprintf(stderr, "%s%sDISCONNESSIONE PER TIMEOUT da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
+			if(DEBUG)fprintf(stderr, "%s%sDISCONNESSIONE PER TIMEOUT O SERVER ROTTO da parte di %d\n", ctime(&curr_time), CLIENT, my_id);
 			shouldUpdate = 0;
 		}
 		
